@@ -79,7 +79,9 @@ nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(-
 section[hidden]{display:none}
 
 /* Calendar */
-.calhead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.calhead{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px}
+.calhead>.btn,.calhead>strong{flex:none;white-space:nowrap}
+.calhead>.note{flex:1 1 320px;margin-left:auto}
 .calhead strong{font-size:17px;min-width:92px;text-align:center}
 .calwrap{overflow-x:auto}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(110px,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line);background:var(--panel);min-width:770px}
@@ -229,7 +231,7 @@ dialog select{width:100%;border:1px solid var(--line);background:var(--bg);borde
       <button class="btn" id="nextM" aria-label="다음 달">›</button>
       <button class="btn" id="todayM">오늘</button>
       <select class="btn" id="cRegion" aria-label="지역"></select>
-      <span class="note" style="margin-left:auto">기울임 글씨는 계획(아직 확정 전), 보통 글씨는 확정 또는 완료입니다. 근무일정에서 확정되거나 수정 창에서 “근무일정 확정”을 체크하면 보통 글씨로 바뀝니다. 지난 계획일은 달 아래 “날짜 미정” 목록에 표시합니다.</span>
+      <span class="note">기울임 글씨는 계획(아직 확정 전), 보통 글씨는 확정 또는 완료입니다. 근무일정에서 확정되거나 수정 창에서 “근무일정 확정”을 체크하면 보통 글씨로 바뀝니다. 지난 계획일은 달 아래 “날짜 미정” 목록에 표시합니다.</span>
     </div>
     <div class="calwrap"><div class="cal" id="cal"></div></div>
   </section>
@@ -281,7 +283,7 @@ dialog select{width:100%;border:1px solid var(--line);background:var(--bg);borde
   </section>
 
   <section id="tab-sched" hidden>
-    <p class="note">근무일정에 “정기점검”으로 올라간 일정을 확정 일정으로 반영합니다. 근무일정 사이트에서 달력 표를 통째로 복사해 붙여넣고 그 달을 고르면, 날짜·사이트·인원을 찾아 방문과 짝지어 보여줍니다. 표 복사본에는 칸별 이름이 들어오지 않아 점검자는 기존 값이 들어가니, 필요하면 고쳐서 반영하세요. 확인한 항목만 점검일과 점검자가 저장되고 <span class="jd ok">확정</span> 표시가 붙습니다.</p>
+    <p class="note">근무일정에 “정기점검”으로 올라간 일정을 확정 일정으로 반영합니다. 근무일정 사이트에서 달력 표를 통째로 복사해 붙여넣고 그 달을 고르면, 날짜·사이트·인원을 찾아 방문과 짝지어 보여줍니다. 이미 완료된 방문도 함께 보여주지만 체크를 꺼 두니, 날짜를 고칠 때만 체크해서 반영하세요. 표 복사본에는 칸별 이름이 들어오지 않아 점검자는 기존 값이 들어가니, 필요하면 고쳐서 반영하세요. 확인한 항목만 점검일과 점검자가 저장되고 <span class="jd ok">확정</span> 표시가 붙습니다.</p>
     <textarea id="schedIn" rows="7" style="width:100%;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:10px;font:inherit" placeholder="예)&#10;10/6 (화) 정기점검 장흥자동차극장 이근화, 장민규&#10;2026-10-12 정기점검 태종대 자동차극장 / 이근화 장민규"></textarea>
     <div class="row" style="margin-top:8px"><select class="btn" id="schedMonth" aria-label="붙여넣은 달"></select><button class="btn primary" id="schedParse">정기점검 일정 찾기</button><span class="note" id="schedState"></span></div>
     <div class="cands" id="schedCands"></div>
@@ -761,12 +763,13 @@ function schedFind(txt,month,open){
   return {found,cands,miss};
 }
 $('#schedParse').onclick=()=>{
-  const st=$('#schedState'); const V=allVisits(); const open=V.filter(v=>v.state!=='done');
-  const r=schedFind($('#schedIn').value,+$('#schedMonth').value||TODAY.getMonth()+1,open); sCands=r.cands; const miss=r.miss;
+  const st=$('#schedState'); const V=allVisits();
+  const r=schedFind($('#schedIn').value,+$('#schedMonth').value||TODAY.getMonth()+1,V); sCands=r.cands; const miss=r.miss;
   const same=c=>{const e=V.find(v=>v.id===c.pick);return e&&e.confirmed&&e.date===c.date};
-  const nSame=sCands.filter(same).length;
-  st.textContent=`정기점검 표기 ${r.found.length}건 중 방문과 맞는 ${sCands.length}건${nSame?` (이미 같은 날짜로 확정 ${nSame}건)`:''}${miss.length?`, 사이트를 찾지 못한 ${miss.length}건`:''}.`;
-  $('#schedCands').innerHTML=sCands.map((c,i)=>{const cur=V.find(v=>v.id===c.pick);const ok=same(c);return `<div class="cand"><input type="checkbox" id="s${i}" ${ok?'':'checked'} aria-label="반영"><div><div class="row"><select class="spick" data-i="${i}">${c.hits.map(e=>`<option value="${e.id}">${esc(label(e))} (현재 ${e.when?md(e.when):(e.month?e.month+'월':'미정')}${e.confirmed?' 확정':''})</option>`).join('')}</select><input type="date" class="sdate" data-i="${i}" value="${c.date}"><input type="text" class="svis" data-i="${i}" value="${esc(c.people.join(', ')||cur?.visitors||'')}" placeholder="점검자" style="border:1px solid var(--line);background:var(--panel);border-radius:5px;padding:3px 6px;font-size:13px;min-width:160px">${ok?'<span class="jd ok">이미 확정</span>':''}</div><div class="msg">${esc(c.line)}</div></div></div>`}).join('')+(miss.length?`<div class="note" style="margin-top:8px">사이트를 찾지 못한 줄: ${miss.map(m=>esc(m.line)).join(' / ')}</div>`:'');
+  const isDone=c=>{const e=V.find(v=>v.id===c.pick);return !!(e&&e.done)};
+  const nSame=sCands.filter(c=>!isDone(c)&&same(c)).length, nDone=sCands.filter(isDone).length;
+  st.textContent=`정기점검 표기 ${r.found.length}건 중 방문과 맞는 ${sCands.length}건${nDone?` (이미 완료 ${nDone}건)`:''}${nSame?` (이미 같은 날짜로 확정 ${nSame}건)`:''}${miss.length?`, 사이트를 찾지 못한 ${miss.length}건`:''}.`;
+  $('#schedCands').innerHTML=sCands.map((c,i)=>{const cur=V.find(v=>v.id===c.pick);const dn=isDone(c);const ok=!dn&&same(c);return `<div class="cand"><input type="checkbox" id="s${i}" ${ok||dn?'':'checked'} aria-label="반영"><div><div class="row"><select class="spick" data-i="${i}">${c.hits.map(e=>`<option value="${e.id}">${esc(label(e))} (현재 ${e.when?md(e.when):(e.month?e.month+'월':'미정')}${e.done?' 완료':(e.confirmed?' 확정':'')})</option>`).join('')}</select><input type="date" class="sdate" data-i="${i}" value="${c.date}"><input type="text" class="svis" data-i="${i}" value="${esc(c.people.join(', ')||cur?.visitors||'')}" placeholder="점검자" style="border:1px solid var(--line);background:var(--panel);border-radius:5px;padding:3px 6px;font-size:13px;min-width:160px">${dn?`<span class="jd ok">이미 완료${cur.date?' '+md(cur.date):''}${cur.date&&cur.date!==c.date?' (근무일정과 날짜 다름)':''}</span>`:''}${ok?'<span class="jd ok">이미 확정</span>':''}</div><div class="msg">${esc(c.line)}</div></div></div>`}).join('')+(miss.length?`<div class="note" style="margin-top:8px">사이트를 찾지 못한 줄: ${miss.map(m=>esc(m.line)).join(' / ')}</div>`:'');
   $('#schedApplyRow').hidden=!sCands.length;
   document.querySelectorAll('.spick').forEach(s=>s.onchange=()=>sCands[s.dataset.i].pick=s.value);
   document.querySelectorAll('.sdate').forEach(s=>s.onchange=()=>sCands[s.dataset.i].date=s.value);
