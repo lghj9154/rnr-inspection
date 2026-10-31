@@ -76,7 +76,7 @@ select.btn{padding-right:28px}
 nav.tabs{display:flex;gap:4px;margin:26px 0 12px;border-bottom:1px solid var(--line);overflow-x:auto}
 nav.tabs button{border:0;background:none;padding:9px 12px;cursor:pointer;color:var(--ink2);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
 nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink);font-weight:500}
-section[hidden]{display:none}
+[hidden]{display:none!important}
 
 /* Calendar */
 .calhead{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px}
@@ -284,7 +284,7 @@ dialog select{width:100%;border:1px solid var(--line);background:var(--bg);borde
 
   <section id="tab-sched" hidden>
     <p class="note">근무일정에 “정기점검”으로 올라간 일정을 확정 일정으로 반영합니다. 근무일정 사이트에서 달력 표를 통째로 복사해 붙여넣고 그 달을 고르면, 날짜·사이트·인원을 찾아 방문과 짝지어 보여줍니다. 이미 완료된 방문도 함께 보여주지만 체크를 꺼 두니, 날짜를 고칠 때만 체크해서 반영하세요. 표 복사본에는 칸별 이름이 들어오지 않아 점검자는 기존 값이 들어가니, 필요하면 고쳐서 반영하세요. 확인한 항목만 점검일과 점검자가 저장되고 <span class="jd ok">확정</span> 표시가 붙습니다.</p>
-    <textarea id="schedIn" rows="7" style="width:100%;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:10px;font:inherit" placeholder="예)&#10;10/6 (화) 정기점검 장흥자동차극장 이근화, 장민규&#10;2026-10-12 정기점검 태종대 자동차극장 / 이근화 장민규"></textarea>
+    <textarea id="schedIn" rows="7" style="width:100%;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:10px;font:inherit" placeholder="비워 두고 [정기점검 일정 찾기]를 누르면 고른 달의 정기점검 현황을 바로 보여줍니다.&#10;근무일정과 대조해 확정 반영하려면: 근무일정 사이트에서 달력 표를 드래그해 복사(Ctrl+C)한 뒤 여기에 붙여넣기(Ctrl+V) 하세요."></textarea>
     <div class="row" style="margin-top:8px"><select class="btn" id="schedMonth" aria-label="붙여넣은 달"></select><button class="btn primary" id="schedParse">정기점검 일정 찾기</button><span class="note" id="schedState"></span></div>
     <div class="cands" id="schedCands"></div>
     <div class="row" id="schedApplyRow" hidden style="margin-top:12px"><button class="btn primary" id="schedApply">선택한 항목 확정 반영</button></div>
@@ -764,6 +764,16 @@ function schedFind(txt,month,open){
 }
 $('#schedParse').onclick=()=>{
   const st=$('#schedState'); const V=allVisits();
+  // 붙여넣은 내용이 없으면: 고른 달의 정기점검을 저장된 데이터에서 바로 보여줌
+  if(!$('#schedIn').value.trim()){
+    const M=+$('#schedMonth').value||TODAY.getMonth()+1;
+    const L=V.filter(v=>(v.when?+v.when.slice(5,7):v.month)===M).sort((a,b)=>(a.when||'9').localeCompare(b.when||'9')||label(a).localeCompare(label(b)));
+    const tag=v=>v.done?'<span class="jd ok">완료</span>':v.confirmed?'<span class="jd ok">확정</span>':v.when?'<span class="jd">계획</span>':'<span class="jd">날짜 미정</span>';
+    const n=k=>L.filter(k).length;
+    st.textContent=`${year}년 ${M}월 정기점검 ${L.length}건 (완료 ${n(v=>v.done)}, 확정 ${n(v=>!v.done&&v.confirmed)}, 계획 ${n(v=>!v.done&&!v.confirmed&&v.when)}, 날짜 미정 ${n(v=>!v.done&&!v.when)}). 줄을 누르면 수정 창이 열립니다.`;
+    $('#schedCands').innerHTML=L.length?`<div class="tbl"><table><thead><tr><th>날짜</th><th>사이트</th><th>점검자</th><th>상태</th></tr></thead><tbody>${L.map(v=>`<tr data-id="${v.id}" style="cursor:pointer"><td>${v.when?md(v.when)+' '+DOW[pd(v.when).getDay()]:'—'}</td><td>${esc(label(v))}</td><td>${esc(v.visitors||'')}</td><td>${tag(v)}</td></tr>`).join('')}</tbody></table></div><p class="note" style="margin-top:8px">근무일정 표를 붙여넣고 다시 누르면, 근무일정 내용과 대조해서 확정 반영할 후보를 보여줍니다.</p>`:'<div class="empty">이 달에 잡힌 정기점검이 없습니다.</div>';
+    $('#schedApplyRow').hidden=true; sCands=[]; return;
+  }
   const r=schedFind($('#schedIn').value,+$('#schedMonth').value||TODAY.getMonth()+1,V); sCands=r.cands; const miss=r.miss;
   const same=c=>{const e=V.find(v=>v.id===c.pick);return e&&e.confirmed&&e.date===c.date};
   const isDone=c=>{const e=V.find(v=>v.id===c.pick);return !!(e&&e.done)};
