@@ -222,6 +222,7 @@ dialog select{width:100%;border:1px solid var(--line);background:var(--bg);borde
     <button role="tab" data-tab="check" aria-selected="false">확인필요</button>
     <button role="tab" data-tab="slack" aria-selected="false">슬랙 완료 반영</button>
     <button role="tab" data-tab="n27" aria-selected="false">27년 신규대상</button>
+    <button role="tab" data-tab="access" aria-selected="false" id="accessTabBtn" hidden>접속 기록</button>
   </nav>
 
   <section id="tab-cal">
@@ -322,6 +323,15 @@ dialog select{width:100%;border:1px solid var(--line);background:var(--bg);borde
     <div class="note" id="slackSkipped" style="margin-top:6px"></div>
     <div class="cands" id="cands"></div>
     <div class="row" id="applyRow" hidden style="margin-top:12px"><button class="btn primary" id="applyBtn">선택한 항목 완료 처리</button><button class="btn" id="ignoreBtn">선택 안 한 항목은 다시 보지 않기</button></div>
+  </section>
+
+  <section id="tab-access" hidden>
+    <p class="note">관리자에게만 보이는 화면입니다. 정기점검 웹을 열 때마다 한 줄씩 기록됩니다.</p>
+    <div class="row"><button class="btn" id="accessReload">새로고침</button><span class="note" id="accessState"></span></div>
+    <h3 style="font-size:15px;margin:14px 0 6px">사람별</h3>
+    <div class="tbl"><table><thead><tr><th>이름</th><th>메일</th><th>마지막 접속</th><th>최근 30일 접속</th></tr></thead><tbody id="accessPeople"></tbody></table></div>
+    <h3 style="font-size:15px;margin:18px 0 6px">최근 접속 100건</h3>
+    <div class="tbl"><table><thead><tr><th>시각</th><th>이름</th><th>기기</th></tr></thead><tbody id="accessRows"></tbody></table></div>
   </section>
 
   <section id="tab-n27" hidden>
@@ -905,7 +915,24 @@ async function start(session){
   if(!canWrite) $('#slackRun').disabled=true;
   db=DB;
   try{await loadAll()}catch(err){showLoadError(err)}
+  // 접속 기록 남기기 (보기는 관리자만)
+  try{await q(sb.from('inspection_access_log').insert({name:nm,device:/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)?'모바일':'PC'}))}catch(e){}
+  try{if(await q(sb.rpc('inspection_is_admin'))){$('#accessTabBtn').hidden=false;loadAccess()}}catch(e){}
 }
+async function loadAccess(){
+  try{
+    const since=new Date(Date.now()-30*864e5).toISOString();
+    const [recent,month]=await Promise.all([
+      q(sb.from('inspection_access_log').select('at,email,name,device').order('at',{ascending:false}).limit(100)),
+      q(sb.from('inspection_access_log').select('at,email,name').gte('at',since).order('at',{ascending:false}).limit(5000))]);
+    const P={}; [...month,...recent].forEach(r=>{const k=r.email;P[k]??={name:r.name||'',email:k,last:r.at,n:0}; if(r.at>P[k].last)P[k].last=r.at});
+    month.forEach(r=>P[r.email].n++);
+    $('#accessPeople').innerHTML=Object.values(P).sort((a,b)=>b.last.localeCompare(a.last)).map(p=>`<tr><td>${esc(p.name)}</td><td class="small">${esc(p.email)}</td><td>${kstTime(p.last)}</td><td>${p.n}회</td></tr>`).join('')||'<tr><td colspan="4" class="empty">아직 기록이 없습니다.</td></tr>';
+    $('#accessRows').innerHTML=recent.map(r=>`<tr><td>${kstTime(r.at)}</td><td>${esc(r.name||r.email)}</td><td>${esc(r.device||'')}</td></tr>`).join('');
+    $('#accessState').textContent=`${kstTime(new Date().toISOString())} 기준`;
+  }catch(e){$('#accessState').textContent='접속 기록을 불러오지 못했습니다: '+(e.message||e)}
+}
+$('#accessReload').onclick=loadAccess;
 sb.auth.onAuthStateChange((ev,session)=>{
   if(ev==='SIGNED_OUT'){started=false;showGate();return}
   if(!started&&session){started=true;start(session)}
