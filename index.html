@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RNR 정기점검 현황</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDEFF1; --panel:#FFFFFF; --ink:#18222D; --ink2:#55616E; --line:#D5DAE0;
+  --done:#17806A; --sched:#2C63D1; --late:#C7780A; --tbd:#9AA3AD; --excl:#B8BEC5;
+  --beam:#E2312B; --focus:#2C63D1;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  font-family:"IBM Plex Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12181F; --panel:#1A222B; --ink:#E6EAEE; --ink2:#9AA6B2; --line:#2C3743;
+  --done:#3DB892; --sched:#6B97F2; --late:#E7A33A; --tbd:#6B7682; --excl:#46505B; --beam:#FF5A4F; color-scheme:dark;}}
+:root[data-theme="dark"]{--bg:#12181F; --panel:#1A222B; --ink:#E6EAEE; --ink2:#9AA6B2; --line:#2C3743;
+  --done:#3DB892; --sched:#6B97F2; --late:#E7A33A; --tbd:#6B7682; --excl:#46505B; --beam:#FF5A4F; color-scheme:dark;}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.55;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 18px 60px}
+header.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+h1{font-size:22px;font-weight:700;margin:0;letter-spacing:-.01em}
+.sub{color:var(--ink2);font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--panel);padding:7px 12px;border-radius:6px;cursor:pointer;font-size:14px}
+.btn:hover{border-color:var(--ink2)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn:disabled{opacity:.5;cursor:default}
+select.btn{padding-right:28px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink2)}
+.chip img{width:22px;height:22px;border-radius:50%}
+
+/* Reel: the year strip */
+.reel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 18px 14px;position:relative}
+.reel-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 22px;margin-bottom:14px}
+.big{font-size:40px;font-weight:700;line-height:1;letter-spacing:-.02em}
+.big small{font-size:18px;color:var(--ink2);font-weight:500;margin-left:4px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--ink2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.months{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;position:relative;min-height:150px;align-items:end}
+.mcol{display:flex;flex-direction:column;justify-content:flex-end;gap:0;border-bottom:1px solid var(--line)}
+.ticks{display:flex;flex-wrap:wrap-reverse;gap:3px;align-content:flex-start;padding:4px 2px}
+.tick{width:12px;height:12px;border-radius:2px;border:0;padding:0;cursor:pointer}
+.tick.done{background:var(--done)} .tick.sched{background:var(--sched)} .tick.late{background:var(--late)} .tick.tbd{background:transparent;box-shadow:inset 0 0 0 1.5px var(--tbd)}
+.mlabels{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;font-size:12px;color:var(--ink2);margin-top:6px}
+.mlabels span{text-align:center}.mlabels .cur{color:var(--ink);font-weight:700}
+.beam{position:absolute;top:-6px;bottom:0;width:2px;background:var(--beam);pointer-events:none}
+.beam::after{content:attr(data-label);position:absolute;top:-18px;left:4px;font-size:11px;color:var(--beam);white-space:nowrap;font-weight:500}
+.nodate{margin-top:10px;font-size:13px;color:var(--ink2);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* Now panels */
+.now{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}
+@media (max-width:860px){.now{grid-template-columns:1fr}}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.pane h2{font-size:15px;margin:0 0 8px;font-weight:700;display:flex;justify-content:space-between}
+.pane h2 span{color:var(--ink2);font-weight:500}
+.pane.late{border-left:4px solid var(--late)} .pane.week{border-left:4px solid var(--sched)}
+.item{display:grid;grid-template-columns:52px 1fr;gap:8px;padding:7px 0;border-top:1px solid var(--line);cursor:pointer;background:none;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left}
+.item:first-of-type{border-top:0}
+.item .d{font-size:13px;color:var(--ink2)}
+.item b{font-weight:500}
+.item .m{font-size:12.5px;color:var(--ink2)}
+.empty{color:var(--ink2);font-size:14px;padding:6px 0}
+
+/* Tabs */
+nav.tabs{display:flex;gap:4px;margin:26px 0 12px;border-bottom:1px solid var(--line);overflow-x:auto}
+nav.tabs button{border:0;background:none;padding:9px 12px;cursor:pointer;color:var(--ink2);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink);font-weight:500}
+section[hidden]{display:none}
+
+/* Calendar */
+.calhead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.calhead strong{font-size:17px;min-width:92px;text-align:center}
+.calwrap{overflow-x:auto}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(110px,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line);background:var(--panel);min-width:770px}
+.cal .dow{font-size:12px;color:var(--ink2);padding:6px 8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.cal .day{min-height:96px;padding:5px 6px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);font-size:12px}
+.cal .day.out{background:var(--bg);color:var(--ink2)}
+.cal .day.today{box-shadow:inset 0 0 0 2px var(--beam)}
+.cal .n{font-size:12px;color:var(--ink2);margin-bottom:3px}
+.ev{display:block;width:100%;text-align:left;border:0;border-left:3px solid;padding:2px 5px;margin-bottom:3px;border-radius:0 3px 3px 0;cursor:pointer;font-size:12px;line-height:1.35;background:color-mix(in srgb,currentColor 9%,transparent)}
+.ev.done{color:var(--done)} .ev.sched{color:var(--sched)} .ev.late{color:var(--late)}
+.ev span{color:var(--ink)}
+.ev.planned span{font-style:italic}
+
+/* Table */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.filters input{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 10px;min-width:180px}
+.tbl{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-weight:500;color:var(--ink2);font-size:13px;white-space:nowrap;position:sticky;top:0;background:var(--panel)}
+td.num{text-align:right}
+.vis{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:4px;padding:1px 7px;margin:0 4px 4px 0;font-size:12.5px;cursor:pointer;background:none}
+.vis::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--c)}
+.vis.done{--c:var(--done)} .vis.sched{--c:var(--sched)} .vis.late{--c:var(--late)} .vis.tbd{--c:var(--tbd)}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:var(--done)}
+
+/* Slack */
+.cands{margin-top:12px}
+.cand{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.cand .msg{font-size:13px;color:var(--ink2);white-space:pre-wrap;max-height:4.6em;overflow:hidden}
+.cand select,.cand input[type=date]{border:1px solid var(--line);background:var(--panel);border-radius:5px;padding:3px 6px;font-size:13px}
+.note{font-size:13px;color:var(--ink2)}
+.banner{padding:10px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);margin:10px 0;font-size:14px}
+.banner.warn{border-color:var(--late)}
+
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);padding:0;width:min(440px,92vw)}
+dialog::backdrop{background:rgba(10,15,20,.45)}
+dialog form{padding:18px}
+dialog h3{margin:0 0 2px;font-size:18px}
+dialog label{display:block;font-size:13px;color:var(--ink2);margin-top:12px}
+dialog input[type=text],dialog input[type=date],dialog textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:7px 9px;margin-top:3px}
+dialog .chk{display:flex;gap:8px;align-items:center;color:var(--ink);font-size:15px}
+dialog .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.gate{max-width:420px;margin:18vh auto;text-align:center}
+@media (prefers-reduced-motion:no-preference){.tick{transition:transform .12s}.tick:hover{transform:scale(1.35)}}
+
+.alerts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.al{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;font-size:13px;color:var(--ink2)}
+.al b{display:block;font-size:20px;color:var(--ink);font-weight:700;line-height:1.2}
+.al.bad{border-left:4px solid var(--beam)} .al.warn{border-left:4px solid var(--late)} .al.info{border-left:4px solid var(--tbd)}
+.jd{display:inline-block;font-size:12px;padding:1px 7px;border-radius:4px;white-space:nowrap}
+.jd.ok{background:color-mix(in srgb,var(--done) 14%,transparent);color:var(--done)}
+.jd.bad{background:color-mix(in srgb,var(--beam) 14%,transparent);color:var(--beam)}
+.jd.warn{background:color-mix(in srgb,var(--late) 16%,transparent);color:var(--late)}
+.jd.info{background:color-mix(in srgb,var(--tbd) 18%,transparent);color:var(--ink2)}
+td.small{font-size:12.5px;color:var(--ink2)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.toolbar .grow{flex:1}
+dialog select{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:7px 9px;margin-top:3px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.src{font-size:12px;color:var(--ink2);margin-top:4px}
+.stchk{display:inline-flex;gap:4px;flex-wrap:wrap;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:4px 6px}
+.stchk label{display:inline-flex;align-items:center;gap:4px;font-size:13.5px;padding:2px 6px;border-radius:4px;cursor:pointer}
+.stchk input{margin:0}
+.mapwrap{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;margin-bottom:18px;align-items:start}
+@media (max-width:860px){.mapwrap{grid-template-columns:1fr}}
+.mapcol{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+#map{width:100%;height:auto;max-height:640px;display:block}
+#map .prov{fill:color-mix(in srgb,var(--ink) 7%,var(--panel));stroke:color-mix(in srgb,var(--ink) 35%,transparent);cursor:pointer;transition:fill .15s}
+#map .prov:hover{fill:color-mix(in srgb,var(--sched) 12%,var(--panel))}
+#map .prov.sel{fill:color-mix(in srgb,var(--sched) 10%,var(--panel))}
+#map .prov.dim{opacity:.45}
+#map .dot{stroke:var(--panel);cursor:pointer}
+#map .dot.late{fill:var(--late)} #map .dot.sched{fill:var(--sched)} #map .dot.done{fill:var(--done);opacity:.55}
+#map .dot.on{stroke:var(--ink)}
+#map .mlabel{fill:var(--ink);paint-order:stroke;stroke:var(--panel);stroke-width:.6px;pointer-events:none}
+.mapside{min-width:0;max-height:700px;overflow:auto}
+.gate{min-height:100vh;display:grid;place-items:center;padding:24px}
+.gate[hidden]{display:none}
+.gate-box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:28px 26px;max-width:360px;width:100%;text-align:left}
+.gate-box h1{margin-bottom:6px}
+.gate-box .btn{margin-top:16px}
+#me img{width:22px;height:22px;border-radius:50%;vertical-align:middle;margin-right:6px}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <h1>정기점검 현황</h1>
+    <p class="sub" id="gateMsg">회사 Google 계정(@rnrvh.com)으로 로그인하세요.</p>
+    <button class="btn primary" id="loginBtn">Google 계정으로 로그인</button>
+  </div>
+</div>
+<div class="wrap" id="app" hidden>
+  <header class="top">
+    <div>
+      <h1 id="title">정기점검 현황</h1>
+      <div class="sub" id="srcline">불러오는 중…</div>
+      <div class="src" id="srcs"></div>
+    </div>
+    <div class="row">
+      <a class="btn" href="https://cinema-schedule-efn.pages.dev/#" target="_blank" rel="noopener">근무 스케줄</a>
+      <span class="chip" id="me"></span><button class="btn" id="logoutBtn" hidden>로그아웃</button>
+    </div>
+  </header>
+
+  <div class="reel">
+    <div class="reel-head">
+      <div class="big" id="bigNum">–</div>
+      <div class="sub" id="bigSub"></div>
+      <div class="legend" style="margin-left:auto">
+        <span><i style="background:var(--done)"></i>완료</span>
+        <span><i style="background:var(--sched)"></i>예정</span>
+        <span><i style="background:var(--late)"></i>지연·결과 미입력</span>
+        <span><i style="box-shadow:inset 0 0 0 1.5px var(--tbd)"></i>날짜 미정</span>
+      </div>
+    </div>
+    <div class="months" id="months"></div>
+    <div class="mlabels" id="mlabels"></div>
+  </div>
+
+  <div class="alerts" id="alerts"></div>
+
+  <div class="now">
+    <div class="pane week"><h2>이번 주 <span id="wkRange"></span></h2><div id="thisWeek"></div></div>
+    <div class="pane"><h2>다음 2주</h2><div id="nextWeeks"></div></div>
+    <div class="pane late"><h2>지연·결과 미입력 <span id="lateCnt"></span></h2><div id="lateList"></div></div>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="cal" aria-selected="true">월별 일정</button>
+    <button role="tab" data-tab="plan" aria-selected="false">일정계획</button>
+    <button role="tab" data-tab="region" aria-selected="false">지역별</button>
+    <button role="tab" data-tab="sched" aria-selected="false">근무일정 확정 반영</button>
+    <button role="tab" data-tab="maint" aria-selected="false">유지보수 계약 대조</button>
+    <button role="tab" data-tab="check" aria-selected="false">확인필요</button>
+    <button role="tab" data-tab="slack" aria-selected="false">슬랙 완료 반영</button>
+    <button role="tab" data-tab="n27" aria-selected="false">27년 신규대상</button>
+  </nav>
+
+  <section id="tab-cal">
+    <div class="calhead">
+      <button class="btn" id="prevM" aria-label="이전 달">‹</button>
+      <strong id="calTitle"></strong>
+      <button class="btn" id="nextM" aria-label="다음 달">›</button>
+      <button class="btn" id="todayM">오늘</button>
+      <select class="btn" id="cRegion" aria-label="지역"></select>
+      <span class="note" style="margin-left:auto">기울임 글씨는 계획(아직 확정 전), 보통 글씨는 확정 또는 완료입니다. 근무일정에서 확정되거나 수정 창에서 “근무일정 확정”을 체크하면 보통 글씨로 바뀝니다. 지난 계획일은 달 아래 “날짜 미정” 목록에 표시합니다.</span>
+    </div>
+    <div class="calwrap"><div class="cal" id="cal"></div></div>
+  </section>
+
+  <section id="tab-plan" hidden>
+    <div class="toolbar">
+      <input id="pq" type="search" placeholder="사이트 검색" aria-label="사이트 검색" style="border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 10px;min-width:180px">
+      <select class="btn" id="pBrand" aria-label="브랜드"></select>
+      <select class="btn" id="pRegion" aria-label="지역"></select>
+      <select class="btn" id="pMonth" aria-label="월"></select>
+      <span class="stchk" id="pState" role="group" aria-label="상태 보기">
+        <label><input type="checkbox" value="done" checked> 완료</label>
+        <label><input type="checkbox" value="sched" checked> 예정</label>
+        <label><input type="checkbox" value="late" checked> 지연</label>
+        <label><input type="checkbox" value="tbd" checked> 날짜 미정</label>
+      </span>
+      <span class="grow"></span>
+      <span class="note" id="pCount"></span>
+      <button class="btn primary" id="addBtn">방문 추가</button>
+    </div>
+    <div class="tbl"><table>
+      <thead><tr><th>상태</th><th>지역</th><th>브랜드</th><th>사이트</th><th>회차</th><th class="num">관</th><th>점검일 / 계획</th><th>점검자</th><th>비고</th><th>유지보수 계약</th></tr></thead>
+      <tbody id="planRows"></tbody>
+    </table></div>
+  </section>
+
+  <section id="tab-region" hidden>
+    <div class="mapwrap">
+      <div class="mapcol">
+        <div class="toolbar">
+          <button class="btn" id="mapAll">전국 보기</button>
+          <label class="note" style="display:inline-flex;gap:5px;align-items:center"><input type="checkbox" id="mapLeftOnly" checked> 남은 방문 있는 곳만</label>
+          <span class="grow"></span><span class="note" id="mapInfo"></span>
+        </div>
+        <svg id="map" viewBox="0 0 460 570" role="img" aria-label="정기점검 사이트 지도"></svg>
+        <div class="legend" style="margin-top:6px">
+          <span><i style="background:var(--late);border-radius:50%"></i>지연 있음</span>
+          <span><i style="background:var(--sched);border-radius:50%"></i>남은 방문 있음</span>
+          <span><i style="background:var(--done);border-radius:50%;opacity:.6"></i>올해 완료</span>
+        </div>
+        <p class="note" id="mapNote" style="margin-top:6px"></p>
+      </div>
+      <div class="mapside" id="mapSide"></div>
+    </div>
+    <p class="note">지역별 월간 방문 수입니다. 칸 안의 숫자는 남은 방문 / 전체 방문이며, 칸을 누르면 그 지역·월의 일정계획 목록으로 이동합니다.</p>
+    <div class="tbl"><table id="regionTbl"></table></div>
+    <h3 style="font-size:15px;margin:18px 0 8px">지역별 남은 방문 (가까운 날짜 순)</h3>
+    <div id="regionLeft" class="now" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr));margin-top:0"></div>
+  </section>
+
+  <section id="tab-sched" hidden>
+    <p class="note">근무일정에 “정기점검”으로 올라간 일정을 확정 일정으로 반영합니다. 근무일정 사이트에서 달력 표를 통째로 복사해 붙여넣고 그 달을 고르면, 날짜·사이트·인원을 찾아 방문과 짝지어 보여줍니다. 표 복사본에는 칸별 이름이 들어오지 않아 점검자는 기존 값이 들어가니, 필요하면 고쳐서 반영하세요. 확인한 항목만 점검일과 점검자가 저장되고 <span class="jd ok">확정</span> 표시가 붙습니다.</p>
+    <textarea id="schedIn" rows="7" style="width:100%;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:10px;font:inherit" placeholder="예)&#10;10/6 (화) 정기점검 장흥자동차극장 이근화, 장민규&#10;2026-10-12 정기점검 태종대 자동차극장 / 이근화 장민규"></textarea>
+    <div class="row" style="margin-top:8px"><select class="btn" id="schedMonth" aria-label="붙여넣은 달"></select><button class="btn primary" id="schedParse">정기점검 일정 찾기</button><span class="note" id="schedState"></span></div>
+    <div class="cands" id="schedCands"></div>
+    <div class="row" id="schedApplyRow" hidden style="margin-top:12px"><button class="btn primary" id="schedApply">선택한 항목 확정 반영</button></div>
+    <p class="note" style="margin-top:16px">근무일정 사이트의 데이터 저장 위치를 알게 되면, 이 단계 없이 매일 자동으로 읽어 반영하도록 바꿀 예정입니다.</p>
+  </section>
+
+  <section id="tab-maint" hidden>
+    <div class="pane" id="chgPane" style="margin-bottom:14px">
+      <h2>계약 변경 내역 <span id="chgMeta"></span></h2>
+      <div id="chgBody"></div>
+    </div>
+    <div class="toolbar">
+      <input id="mq" type="search" placeholder="사이트 검색" aria-label="사이트 검색" style="border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 10px;min-width:180px">
+      <select class="btn" id="mJudge" aria-label="판정"></select>
+      <span class="grow"></span>
+      <span class="note" id="mCount"></span>
+    </div>
+    <div class="tbl"><table>
+      <thead><tr><th>판정</th><th>브랜드</th><th>사이트</th><th class="num">일정</th><th class="num">완료</th><th>다음 방문</th><th>계약 정기점검</th><th>계약 종료일</th><th>관별 계약 구성</th></tr></thead>
+      <tbody id="maintRows"></tbody>
+    </table></div>
+    <p class="note">판정은 일정계획(웹에서 수정한 값 포함)과 유지보수 계약을 오늘 날짜 기준으로 매번 다시 계산합니다.</p>
+  </section>
+
+  <section id="tab-check" hidden>
+    <h3 style="font-size:15px;margin:4px 0 8px">유지보수 계약 관련</h3>
+    <div class="tbl"><table><thead><tr><th>구분</th><th>사이트</th><th>내용</th></tr></thead><tbody id="chkMaint"></tbody></table></div>
+    <h3 style="font-size:15px;margin:18px 0 8px">일정계획 시트 내부 (사이트 탭 ↔ 달력, 원본 기준)</h3>
+    <div class="tbl"><table><thead><tr><th>구분</th><th>사이트</th><th>내용</th></tr></thead><tbody id="chkCal"></tbody></table></div>
+  </section>
+
+  <section id="tab-slack" hidden>
+    <p class="note">PM팀 채널에서 올해 “정기점검 완료” 글을 찾아 아직 완료되지 않은 방문과 짝지어 보여줍니다. 확인한 것만 반영되며, 날짜는 글 게시일로 들어갑니다(필요하면 고쳐서 반영).</p>
+    <div class="row"><button class="btn primary" id="slackRun">슬랙에서 완료 보고 찾기</button><span class="note" id="slackState"></span></div>
+    <div class="note" id="slackSkipped" style="margin-top:6px"></div>
+    <div class="cands" id="cands"></div>
+    <div class="row" id="applyRow" hidden style="margin-top:12px"><button class="btn primary" id="applyBtn">선택한 항목 완료 처리</button><button class="btn" id="ignoreBtn">선택 안 한 항목은 다시 보지 않기</button></div>
+  </section>
+
+  <section id="tab-n27" hidden>
+    <p class="note">유지보수 계약에 정기점검이 있으나 2026년 설치라 올해 일정계획에서 빠진 곳입니다. 27년 계획 수립 시 포함합니다.</p>
+    <div class="tbl"><table><thead><tr><th>브랜드</th><th>사이트</th><th>설치(오픈)일</th><th>계약 형태</th><th>정기점검</th><th>계약 종료일</th><th>관</th></tr></thead><tbody id="n27Rows"></tbody></table></div>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <form method="dialog">
+    <h3 id="dSite"></h3>
+    <div class="note" id="dMeta"></div>
+    <label class="chk"><input type="checkbox" id="dDone"> 점검 완료</label>
+    <div class="two">
+      <label>점검일<input type="date" id="dDate"></label>
+      <label>계획월<select id="dMonth"></select></label>
+    </div>
+    <label class="chk" style="margin-top:8px"><input type="checkbox" id="dConf"> 근무일정 확정</label>
+    <label>점검자<input type="text" id="dVis" placeholder="예: 김영용, 장민규"></label>
+    <label>메모<textarea id="dMemo" rows="2"></textarea></label>
+    <div class="note" id="dContract" style="margin-top:10px"></div>
+    <div class="note" id="dSrc" style="margin-top:6px"></div>
+    <div class="foot"><button class="btn" value="cancel">닫기</button><button class="btn primary" id="dSave" value="save">저장</button></div>
+  </form>
+</dialog>
+
+<dialog id="addDlg">
+  <form method="dialog">
+    <h3>방문 추가</h3>
+    <label>사이트<select id="aSite"></select></label>
+    <div class="two">
+      <label>회차<select id="aHalf"><option value="">연 1회</option><option>상반기</option><option>하반기</option><option>추가</option></select></label>
+      <label>계획월<select id="aMonth"></select></label>
+    </div>
+    <label>점검일<input type="date" id="aDate"></label>
+    <label>점검자<input type="text" id="aVis"></label>
+    <label>메모<input type="text" id="aMemo"></label>
+    <div class="foot"><button class="btn" value="cancel">취소</button><button class="btn primary" value="save">추가</button></div>
+  </form>
+</dialog>
+
+<script>
+const MAP={"prov":[{"name":"제주특별자치도","region":"강원, 제주","d":"M198.8,522.8L200.1,525.1L199.7,526.4L198.2,526L197.6,524.9ZM184.7,518.6L186.2,519.6L188.5,519.3L188.8,520.7L190.9,522.6L194.5,522.7L195.6,525.2L194.7,526.6L195.3,528L197.3,527.9L197.6,529.1L196.5,530.1L194.9,536.2L192.2,538.2L189.2,544.5L186.9,545.2L184.5,544.7L181.8,547.5L174.9,548.2L173.4,548.8L171.6,551.2L169.9,551.7L168.9,550.9L163.7,551.3L162.7,552.3L159.6,553.1L158,551.3L156.4,552.1L154.9,550.9L152.6,552.2L147.4,551.5L143.5,555.9L140.3,551.9L136.3,549.4L134.4,546.1L135,540.7L142.5,533.6L142.5,531.9L146.2,530.2L146.4,528.7L148.7,528.6L152.7,526.3L153.4,526.9L160.4,524.3L161.4,523.2L163.2,523.7L165.2,522.2L165.9,523.2L168.6,522.6L169.8,521.5L172.7,521.5L173.6,519.7L182.7,519.4Z"},{"name":"경상남도","region":"경남","d":"M302.5,410.2L304.8,410.7L305.8,413.4L303,413L301.4,411.7ZM322.5,393.7L323.3,397.1L324.5,398.6L323.1,399.6L321.5,399.2L321.6,397.8L320.6,396.5ZM302.5,391.3L304.7,393.5L303.3,395.3L300.6,394.6L299.5,393L300.9,391.5ZM299.2,389.3L300.4,390.1L299.2,392.4L298,392.6L296.8,391.1L297.1,389.9ZM286,383.4L286.3,385.5L288.8,388.3L288.5,392.3L285.3,390.7L285.2,391.4L282.3,391.7L280.8,391L280.2,388.3L281.6,387.3L283.9,383.4ZM274.9,380.7L276.7,381.3L277.7,383.9L275.1,388.1L277.2,392.2L278.7,392.7L279.6,394.8L282.5,392L288.2,393.1L288.3,395.4L287.5,395.8L287.9,400.8L285.4,403.4L284.5,402.9L282.2,404.2L279.8,404.4L279,402L279.2,397.6L275.6,398.7L276.3,401.7L274.2,403.1L272.6,402.7L271.6,401L270.1,400.3L271.4,398.4L267.7,389.6L269.3,387.9L269.6,385.6L271.2,385L271.6,382.7L272.8,381.1ZM338.4,371.3L339.5,372.3L341,372.1L341.7,373.5L340.2,374.7L339.6,377.4L342.2,380.6L341.5,381.7L341.9,383.8L341.3,385.3L339.7,386.4L341.1,387.8L342.8,386.2L343.5,388.5L340.1,391.3L343.3,396.1L340.7,395.9L340.7,394.1L339.3,394.6L337.8,394L337.3,396L337.9,396.7L335,399L336.2,401L337.4,400.7L338.6,401.5L333.8,402.1L334.6,403.4L332.7,405.2L330.3,403.7L332.3,401.8L330,401.2L329,398.7L327.3,397.8L326.9,396.5L330.2,395.9L330.6,395.1L330.1,389.9L325.1,394.5L323.9,392L322.3,391.3L321.5,387.6L326,382.9L327.7,384.5L330.5,383.9L331.7,385.2L332.8,385.2L330.7,380.7L333.5,379.1L335.6,379L335.9,377.4L333.6,376.7L334.4,374.4L335.7,373.5L336.2,376.5ZM313.3,314.2L314.2,314.6L318.3,313L319.5,311.5L324.2,311.4L324.5,307.8L325.9,307.1L326.7,312.9L328.5,313.8L330.6,316.7L332.4,317.3L336.6,315.5L339.3,315.9L340.2,317.5L342,317.2L347,318.7L348.1,316.5L352.4,315.6L353.9,313.2L357.1,311.5L359.2,311.8L362.8,314.5L364.5,313.3L365.9,313.8L365.9,316.9L361.9,319.2L363.8,322.4L372.9,325.8L373.1,327.3L375.6,330.4L377.2,331.8L380.1,331.4L382,334.4L379.9,339.2L378.4,340.2L376.2,338.9L374.5,340.8L373.3,344.4L370.2,346.3L369.1,345.8L368.3,347.3L365.3,348L364,351.9L354.9,353.9L353.8,355.1L354.7,357.1L353.4,358.6L351.6,359.5L347.6,359.5L348.2,361.1L350.7,362.4L351.5,364.6L348.2,366.4L346.4,365.1L342.7,366.1L340.2,364.8L339,360.3L337,362.3L334.7,360.4L333,360.8L331.4,358.1L330.7,354.3L329,356.9L332,362L332.1,364.9L334.8,368.5L330.1,370.2L326.6,364.1L325.3,365.6L322.9,364.6L321.2,365.6L320.7,368.2L319,368.1L317.9,369.8L316.6,369.1L314.1,370.4L314.8,371.8L319.4,370.2L319.6,368.3L322.4,368.9L321.5,371.2L324,373.9L322.1,376.1L320.8,376.6L318.9,375.9L317.4,385.8L318.3,387.6L319.8,383.8L321.3,386.6L320.2,387.6L319.9,390.7L317.6,392L319.1,392.6L318.6,397.4L317.7,398.8L316.2,399.1L314.8,396.3L313.8,395.8L314,393.8L310.8,392.5L312.3,391.3L313.8,392.7L313.9,390.1L315.2,388.9L313.7,387.2L312.7,388.3L309.4,386.9L307.5,385.1L308.2,384.4L312.1,384.4L310.3,380.9L307.6,381.7L307.6,384.1L306.2,384.9L304.8,384L305.1,381.9L302.8,380.9L299.2,381.6L299.7,385.9L293.2,384.9L287.8,382.5L285.7,379.7L287.5,377.5L286.5,375.2L287.3,373.7L285.4,372L284,372.9L284.6,376.1L282.5,376.4L281.9,377.5L280.2,376.5L279.1,377.6L277.8,376L277.5,374L275.6,379.5L273.2,380.6L270.1,380.3L266,381.3L264.3,378L266.1,373.6L264.9,372.4L264.6,370.3L262.3,369.1L262.1,367.5L260.6,367.1L258.6,365L258.7,362.3L252.7,356.5L251.8,349.1L250.6,348.5L249.1,344.4L252.6,342.1L251.8,338.7L254.2,334.8L256,333.6L256.4,330.5L254.6,330.3L253.9,329.1L253.9,327.5L255.2,326.7L252.9,321.9L250.2,319.9L249.9,318.8L251.8,316.8L252,314.6L253.2,313.5L252.6,311.1L254.6,305.5L255.9,304.3L255.9,299.4L260.6,295.6L262.7,291L264.9,291.4L269.6,288.3L270.5,288.6L271.3,286.3L274.2,283.8L274,286L274.7,286.6L276.5,286.1L277.7,287.5L277.9,289.7L279.4,289.2L281,290.2L282.1,289.6L284.3,292.4L285.9,291.7L287.4,292.4L289,291.2L293.4,293.1L293.8,296.4L295.7,296.7L296.6,299L298.5,299.9L299.6,303L299.7,306.9L296.6,308L296.6,310L298.3,309.5L299.6,310.9L302.4,311.2L303,309.7L304.5,311L308.1,309.8L312,311.1Z"},{"name":"경상북도","region":"경북","d":"M400.7,310.2L392.9,307.3L388.7,310.5L385.3,309.9L384.8,308.7L385.5,306.2L384.8,305.2L381,303.2L377.2,303.8L376,302.8L375.2,304.1L371.4,305.1L369.9,307.2L370.2,311.3L368.1,310.3L362.8,314.5L359.2,311.8L357.1,311.5L353.9,313.2L352.4,315.6L348.1,316.5L347,318.7L342,317.2L340.2,317.5L339.3,315.9L336.6,315.5L332.4,317.3L330.6,316.7L328.5,313.8L326.7,312.9L325.9,307.1L327.3,303.4L330.3,301.4L333.2,301.6L332.7,302.8L333.7,305L338.6,303.1L339.6,299.5L338.5,296.3L341.3,294.7L340.7,292.6L344.1,289.6L345.1,286.9L344.5,283.8L343.1,282.5L343.7,278.2L342,274.8L339.2,273.8L333.3,274.7L331.1,277.4L328.3,278.2L326,277.7L326.6,281.3L325.7,283.5L323.2,285.7L321.8,285.8L321.1,284.6L321.8,281.7L319,281.8L317.2,283.2L314.5,288.8L314.9,290.3L317.5,290.2L320.6,291.2L322,292.6L321.3,294.5L317.3,294.4L314.6,299L315.1,300.7L318.3,302.8L318.4,305L317.1,306L312.4,304.6L311.7,305L312.1,307.2L315.9,311.1L314.5,314.1L313.3,314.2L312,311.1L308.1,309.8L304.5,311L303,309.7L302.4,311.2L299.6,310.9L298.3,309.5L296.6,310L296.6,308L299.7,306.9L299.6,303L298.5,299.9L296.6,299L295.7,296.7L293.8,296.4L293.4,293.1L289,291.2L287.4,292.4L285.9,291.7L284.3,292.4L282.1,289.6L281,290.2L279.4,289.2L277.9,289.7L277.7,287.5L276.5,286.1L274.7,286.6L274,286L273.8,282.5L275.9,281.2L274.8,276.8L273.3,275.6L273.4,273.1L276.6,269.9L278.1,270.2L280.2,268.5L279.9,265.8L280.7,263.5L282.3,262.4L283,260L281.4,256.5L282.2,255.3L284.4,254.4L286.4,255.9L287.6,255.2L285.8,251.3L287.1,249.6L284.2,248.1L280.7,250.2L279.2,249.6L277.7,247.5L274.6,246.1L273.6,247.8L271.3,247.7L270.5,244.3L271.4,242.3L274.5,239.6L273.1,234.7L273.8,233.1L273.1,231.6L273.7,227.2L275.8,224.5L275.3,222.8L273.1,221.5L273.1,219.8L272.1,218.5L269.1,218.2L267,216.2L269.1,214L271.2,214L271,212L272.2,211.8L273.1,209.8L274.4,212.3L277.8,213.5L277.9,208.8L274.2,206.2L277.8,206L277.8,204.7L280.2,201.6L282.3,203.5L285.1,202.7L287.2,204.5L289.1,204.6L288.9,203.1L286,200.5L288.1,193.7L290.1,194.9L292,194.7L292.4,193.4L294.6,191.9L296.7,193.3L301,193.8L300.6,190.4L302.2,190.5L302.9,188L306.2,189.6L309.3,193.8L310.4,193.6L313,195.2L314.2,193.9L317.4,194.1L319.7,190.4L319.6,188.8L317.7,187.6L319,185.1L319.1,182.5L324.9,177.6L325,176.6L327.4,176L329.6,173.7L329.1,172.1L330.6,170.9L334.3,171.4L336.1,168.7L339.1,170L340,171.2L342.8,171.3L344.2,172.4L345,171.8L344.2,169.5L346.9,166.5L350.2,167.5L351.8,170.1L355.8,170.8L358,166.1L359.8,165.8L361,167.5L362.9,166.9L369.5,168.5L370.4,166L372,165.2L375.6,167.1L380,171.2L383.1,170.8L382.5,167.9L385.8,165.1L386.2,163.6L388.1,163.8L388.8,162.4L391.7,160.8L393.7,160.6L395.1,163.3L395,165.3L398.8,168.9L397.8,170L397.4,172.9L398.2,174.7L397.3,177.3L398.2,180.2L397.9,186.4L399,190.5L401.3,193.8L401.7,196.5L403,198.5L402.1,199.5L402.8,205.4L399.6,208.3L397.6,213L397.5,215.8L399.9,220.1L400.4,225L399.4,227L399.5,232.4L394.9,242L395.1,247.8L394.4,249.8L395.4,251.3L395.3,254.1L394.4,254.6L396.6,258.8L396.4,261.8L399.9,265.3L394.7,270.3L395.3,272.3L399,275.6L400.8,276.1L404.9,272.7L408.5,266.8L410.3,267.6L411.4,273.3L409.3,276.2L409.1,278.5L407.5,281.7L406.2,282.6L406.9,288.9L405.5,292.9L405.9,293.7L404,296.6L404.5,298.2L402.5,305L402.7,306.7Z"},{"name":"전라남도","region":"전라","d":"M226.2,469L226.8,474.1L225.2,471.9L225.2,470.3ZM48.3,465.6L49.6,465.8L52.4,470.1L51.5,470.7L48.2,468.4ZM166,457.4L167.1,458.3L168.8,458.3L168.2,460.9L165.8,462.7L164,463.2L162.3,461.6L163.2,458.3L165.2,457.1ZM175,455.8L176.7,456.8L175.6,459L176.6,461.4L175.2,464.2L172.8,462.5L172.3,460.8L173.9,458.5L172.8,457.4L174.1,455.3ZM193.7,453.7L196.4,457.9L195.6,459.9L193,460.2L190,457.9L192.1,454.3ZM167.5,451.9L171.3,453.7L172.1,455L170.9,455.7L171.4,457.3L169,458.1L165.8,456.4ZM223.2,450.2L223.2,454.2L220.8,453.6L221.3,451.7ZM124.8,443.4L126,444.9L128,444.5L129.2,447.6L127.5,447.1L125.9,447.9L125.4,447L123.8,447L123.2,445ZM201.3,441.3L203.6,442.1L202.7,443.9L200.1,445.2L198.9,444L199,442.4ZM189.4,440L190.1,440.8L191.8,440.3L194.1,442.1L193,444.3L191.7,443.8L189.9,445.5L188.8,443L186.9,442.7L186.1,443.5L184.6,442.6L185.2,440.6L186.5,442L187.7,440.5ZM205.2,437.7L206.8,439.2L209.8,439.5L210.3,441.8L209.1,441.7L206.4,442.4L202.9,439.5L203.3,437.7ZM176.9,435.1L180.8,437.7L180.5,439.1L182.1,443.2L183.9,444L183,446.1L180.7,446.6L179.6,445.6L177.7,446.1L174,442L173.2,437.1L173.9,436ZM197.9,434.1L198.4,435.1L195.8,439.7L191.4,438L193.1,434.9L196.8,436.3ZM189.1,431.1L191.6,436.3L185.5,437.3L184.1,439.9L183.4,439.3L184.2,437.2L182.6,436.7L183.3,434.7L185.3,432ZM206.3,429.6L207.8,430.2L208.5,432.4L207.8,434.9L205.4,432.9L205,430.4ZM239.9,428.1L243.1,429.1L243.4,428.5L245.9,430.5L245.7,432.4L242.3,434.1L242.2,432L240.1,431.3L239.2,429.8ZM220.5,426L221.4,427.8L219.7,432.1L212.5,432.2L210.4,428.7L212.5,426.4L213.5,428L217.6,425.9L218.5,426.5ZM126.3,425.6L127.3,427.2L124.8,429.6L124.7,427.2ZM239.5,420.7L241.2,421.7L239.8,424.3L242.2,424.5L243,425.8L241.4,427L239,427.4L238.4,425.6L239.5,425L238.6,423.6L237.5,423.4ZM262.4,420L263.6,420.1L266.9,426L264.8,426.6L264.5,425.7L261.1,423.7L260.2,421.4ZM255.7,416.8L257.4,418.4L255.8,420L254.2,417.8ZM141.8,416.4L146.1,418.2L146.4,420.1L148.8,420.7L152.4,424.8L151.6,428.7L150.5,429.7L151.1,431L148.8,433.7L147,434.8L145.2,434.4L144.5,435.9L143,435.6L142.8,437.4L141.2,437.5L137.8,439.5L135.5,440L132.4,439.3L132.4,437.9L130.8,437.2L128.7,433.5L129.8,431.2L133.3,427.7L135.5,426.8L135.9,425.1L137.5,424.5L139.8,421.8L142.1,421.6L142.6,420.5L141,418.4ZM246.6,413.4L248.1,414L246.8,415.7L245.3,415ZM109.9,412.3L110.3,414.9L108.7,415.6L107.5,415.3L107,413.8ZM127.1,411.8L128.2,413.9L129.9,414.7L130.5,416.4L129.3,417.9L129.8,419.8L128.4,419.9L128,421.2L125.4,422.4L125.2,418.8L126.8,419.2L128,417.5L126.6,414.4L125.4,414.5L125.5,412.4ZM125.5,409.4L125.7,411.2L124.5,413.8L126.1,415L126.8,416.9L125.9,418.6L123,418.9L122.4,414.8L122.3,412.2L123.8,411.7L123.8,410.6ZM133.4,407.9L136.4,409.1L136.9,412.1L134.6,413.7L131.9,413.3L130.3,410.7L131,408.9ZM128.3,406.9L127.9,411L126.7,409.8L126.7,406.8ZM137.3,404.7L137.4,407L136.2,408L134.5,407.3L134.4,406ZM76.4,405.3L78.3,406L76.9,407.3L76.6,409L75.2,409.4L75.4,410.9L74.2,411.5L74.1,413.1L72.4,412.5L71.7,411L72.8,407.6L74,405.5ZM57.7,404.2L57.9,405.8L57,407.3L54.8,408.1ZM263,401.9L266,403.6L266.4,405.1L265.2,407.2L266.7,409.2L267.2,412.3L266.5,414.2L267.6,416.3L266,416.8L263.1,416.1L259.9,413L261,411.6L261,409.7L262.9,408.3L263.8,406.4ZM119,402.3L119.6,403.2L122.7,404.3L122.2,406.9L120.5,407.5L120,408.9L118.8,409.7L114.7,407.6L114.7,404.3L116.8,403.9L118.3,401.6ZM128.1,397.4L129.3,398.2L131.5,397.7L132.7,399.5L134.7,399.5L137.2,402.1L137.4,403.4L133.3,406.7L131.2,407L130.3,405.7L127.5,404.5L127,403.6L128,400L127,398.1ZM121.3,394.8L121.4,399.3L119.7,400.1L116.8,400L117.5,401.9L116.9,403.2L114.9,403.9L113,402.7L112.5,398.8L114.1,397.7L116.4,397.7L119.4,395ZM135.3,395L135.7,399.1L132.5,399.1L131.5,397.4L129.6,397.5L129.6,396.1L132.3,395.3L134.2,393ZM130.8,387L132.7,387.8L133.7,390.8L130.8,392.7L131.3,395L129.7,395.6L126.2,390.4L128.2,389.4L129.8,390.2ZM260.5,385.4L262.8,386.2L262.8,388L260.5,388.5L258.4,386.8ZM145.5,383.1L146.7,384.4L148.7,384.4L149.3,385.9L147.8,386.3L147.8,389.2L150.4,388.9L151.6,390.6L150.4,393.8L148.3,393.4L149,391.5L148.6,390.5L143.9,389.7L142.2,391.3L139.9,390.3L144.3,388.6L146,386L144.2,384.3ZM140.1,381.5L142.1,382.2L140.5,384.4L139.3,382.9ZM126.6,381.7L128.9,383L129.9,385.2L129.3,387.8L125.6,390L121.3,388.8L120.6,387.6L122.6,384L124,384.4L124.8,383.4L126.2,383.3ZM262.1,380.6L262.2,382.1L264.3,382.1L265.9,383.8L265.9,386.7L264,386L263.8,384.7L259.4,384.1L261,380.5ZM138.9,376.7L140.2,377.3L137.3,383.8L136.7,380.7L137.8,377.5ZM132.3,372.6L134,372.7L135.4,373.8L136.7,376.7L135.6,380.7L134.3,381.5L131.5,380.2L132.5,378.6L132.3,375.2L130.9,375.8L129.4,375.2ZM133.4,369.5L135.2,369.7L137.8,371.5L137.4,372.8L133.5,371.9L132.3,370.2ZM134.6,360.9L131.9,363.7L131.1,369.2L128.9,370.1L127.4,369.3L125.4,369.2L125.4,365.1L128.4,364.1L131.1,361ZM249.1,344.4L250.6,348.5L251.8,349.1L252.7,356.5L258.7,362.3L258.6,365L260.6,367.1L262.1,367.5L262.3,369.1L264.6,370.3L264.9,372.4L266.1,373.6L265.4,376.5L263.9,378.7L261.3,380L258.3,383.8L254.2,386.7L252.4,383.7L250.2,383.4L252.1,386.1L250.1,387.8L251.8,390.4L254.4,392.3L256,390.9L256.6,391.6L258.9,389.4L261.8,389.8L264.1,388.8L265.1,389.3L264.7,394.1L262.7,397.7L263.5,399L263.1,401.7L259.4,403.3L255.7,399.8L254.2,403.8L252.9,405.2L254.2,410.7L252.6,411.4L250.1,410.1L248.6,411L247,409.1L247,406.4L250.2,399.5L249.3,399.1L247.5,394.6L244.8,394.3L246,392.1L244,387.5L240.6,390.8L234.9,392.8L236.4,394.2L234.4,395.7L233.7,397.4L234.9,398.6L234.6,399.6L232.6,401.2L234,404.2L239,405.8L238.8,408.2L241.1,408.1L240.8,409.8L241.8,410.1L243.4,416.1L241.8,417.5L239.4,417L238.4,417.7L235.7,416.3L234.3,417.2L235.4,419.2L237.5,420.1L234.9,424.9L233.1,425.1L232.9,426.7L229.1,428L229.8,430.8L228.5,431.2L225.7,427.6L224.1,427.1L225.3,425.6L223.2,423.4L219.4,423.3L218.1,422.1L216.1,423.1L213.4,423L211.5,420.6L211.6,419.4L214.1,416.9L216.3,415.8L216.4,412.6L218.6,410.5L219.2,412.4L220.8,411L221.3,407.3L222.7,404.3L225,403.4L225.6,405.5L225,408L227.9,408.8L229.4,404.5L228.6,400.1L227,400.4L226.1,402.2L224.3,401.2L223.6,402.1L221.7,398.6L219.4,401.6L218.5,404.7L217,406.1L213.8,405.9L212.8,405.1L211.1,407.6L208,409L206.8,411.1L202,413.9L203.2,414.8L201.9,415.9L201,418.3L201.4,421.3L200.2,421L199.1,422.2L200.3,423.7L199.4,425.1L200.5,426.6L197.3,430.5L192.4,429.6L193.3,432.5L185.4,428.7L185.7,418.3L183.9,415L182.8,425.9L181.4,426.5L182,428.1L180.4,430.8L178,431.3L176.6,432.7L174.3,433.2L171.5,435.1L171.7,439.5L170.3,440.6L170.3,442.9L166.6,443.2L165.6,445L163.4,445.5L162.9,443.4L164.1,441.9L163.6,439.2L160.4,439.5L160.4,437.2L161.6,436.4L161.2,435L163.3,433.9L161.1,431.8L160.1,432.7L158.6,430.4L159.3,429.1L158.4,427.6L159.7,424.6L158.7,422.1L156.5,420.9L156.3,419.8L154,420.9L152.2,419L150.8,419.2L148.5,418L146.9,418.7L146.3,416.3L144.1,415.7L144.6,412.3L143.4,412L142.1,408.9L142.4,405.9L143.7,404.1L144.7,399.5L145.8,399.1L148.6,401.5L149.9,405L149,405.8L149.2,407.9L152,413.5L156.7,416.3L156.2,413.9L151.8,410.9L150.5,407.7L149.3,406.7L151.3,405.4L152.9,402.2L151.2,401.5L152.3,400L152.2,398.6L157.9,397L157.2,395.4L154,397L151.3,397.2L150.8,396.2L152.9,391.6L154.4,390.1L153.4,388.4L154,387.3L153,386.3L154.2,384.2L153.2,383.3L152.8,380.6L153.4,379.1L152.2,378.2L151.2,382.5L149.3,383.8L148.2,383.3L147.5,381L145.4,378.8L146.3,376.7L148.5,378.2L150.6,376.6L149.4,375.1L153,372.8L152.4,370.6L150,371.4L149.4,368.3L148,366.5L145.9,370.5L145.1,369.4L142.6,370L143.7,371.5L142.2,374L139.9,373L140.5,370.9L139.5,369.5L136.5,369.5L134.5,368.6L135,364.9L136.9,364L140.3,365.5L141.4,364.3L142.3,361.1L143.5,360.7L147.8,361.9L149.4,360.2L148.6,366.1L151.3,368.2L153.6,367.6L154.4,368.9L153.8,372L157.2,369.7L158.1,368L157.1,366.9L158.7,366.1L157.6,364.7L155.5,364.6L154.1,361.8L149.1,356L146.4,357.5L145.6,352.6L146.7,349.8L147.7,350L147.7,346.5L150.5,346.4L152.1,344.7L154.3,334.4L155.6,332.5L160.2,332.9L161.1,334.2L160.5,336.7L163.6,340.3L163.5,342.7L164.5,344.6L166.1,344L169.4,344.8L168.5,342.9L170.4,341.8L172.1,343.2L173.7,343.3L175.5,340.2L178.1,340.3L178.5,338.8L179.7,338.8L180.7,337.7L180.5,335.8L182.3,333L182,330.3L183.3,328.7L187.3,328.4L188.4,326.7L190.3,328.7L194.7,331.2L194.1,332L196.8,334.7L197,335.8L199.5,335.8L200.6,335L200,332.6L205.2,328.8L205.5,331.7L206.4,332.2L205.8,335.4L204.9,336.3L206.2,337.6L207,336.9L208.1,338.7L207.7,341.7L206.6,341.3L206.2,343.5L211.8,345.3L216.1,342.1L219.8,343.7L220.4,341.6L223.5,344.1L225.8,343.9L227.1,345L231.2,343.2L233.5,345L237.3,339.4L240.6,338.6L243,339.4Z"},{"name":"전라북도","region":"전라","d":"M146.1,313.1L146.9,313.9L146.2,315.6L142.8,318.2L141.6,316.6L143.4,316.3L143.8,314.9L145.1,314.8ZM254,268.5L255.4,269.7L255.8,271.4L257.8,269.1L258.8,269.7L259.5,272L266.2,273.9L267.2,272.6L271.5,271.4L273.4,273.1L273.3,275.6L274.8,276.8L275.9,281.2L273.8,282.5L274.2,283.8L271.3,286.3L270.5,288.6L269.6,288.3L264.9,291.4L262.7,291L260.6,295.6L255.9,299.4L255.9,304.3L254.6,305.5L252.6,311.1L253.2,313.5L252,314.6L251.8,316.8L249.9,318.8L250.2,319.9L252.9,321.9L255.2,326.7L253.9,327.5L253.9,329.1L254.6,330.3L256.4,330.5L256,333.6L254.2,334.8L251.8,338.7L252.6,342.1L250.3,344.2L249.1,344.4L243,339.4L240.6,338.6L237.3,339.4L233.5,345L231.2,343.2L227.1,345L225.8,343.9L223.5,344.1L220.4,341.6L219.8,343.7L216.1,342.1L211.8,345.3L206.2,343.5L206.6,341.3L207.7,341.7L208.1,338.7L207,336.9L206.2,337.6L204.9,336.3L205.8,335.4L206.4,332.2L205.5,331.7L205.2,328.8L200,332.6L200.6,335L199.5,335.8L197,335.8L196.8,334.7L194.1,332L194.7,331.2L190.3,328.7L188.4,326.7L187.3,328.4L183.3,328.7L182,330.3L182.3,333L179.7,338.8L178.5,338.8L178.1,340.3L175.5,340.2L173.7,343.3L172.1,343.2L170.4,341.8L168.5,342.9L169.4,344.8L166.1,344L164.5,344.6L163.5,342.7L163.6,340.3L160.5,336.7L161.1,334.2L160.2,332.9L156.2,331.5L160.6,323.4L163.5,321.9L165.4,322.6L167,321.2L170.3,321L171.5,318.3L173.9,318.3L175.3,319.8L175.9,317.2L173,316L171.4,316.8L165.3,316.5L164.2,317.4L161.3,316.7L159.3,314.9L159.1,311.9L164.6,306.6L166.9,305.4L167.7,305.8L170.2,303.3L172.2,300.5L171.9,296.4L173.5,295.5L178.1,295.4L183.8,297.5L184.4,295.2L180.8,293.4L177.5,290.1L180.7,288.6L185.3,288.8L186.3,285.9L185,285.1L183.8,286.4L181.1,286.1L180.2,286.7L176.2,285.8L175.5,287L171.3,286.7L171.3,281L169.7,280.5L164.3,281.3L163.7,278.2L173.5,277.4L175.4,276.9L176.5,275.4L180.2,275.8L182.1,272.9L187.1,271.9L191.4,269.2L192.2,264L193.7,261.2L196.2,261.4L198.9,259.7L201.6,260.8L202.7,260.4L204.3,261.6L206.4,261.1L207.4,265.9L209,267.5L213.2,268.3L213.5,266.6L216.1,266.9L216.9,265.9L218.6,266.7L219,265.3L222.3,265.8L222.8,264L224.5,264.5L226.2,264L227.2,262.7L229.8,262.2L231.1,264.5L231.6,270L232.7,271.9L234.9,274.5L236.9,272.7L239.3,276.9L240.3,276.5L241.9,277.5L245.6,276.1L245.9,272L250.3,272.8L251,274.1L252.4,274.5L253.5,271.2L252.5,271.1L252.9,268.6Z"},{"name":"충청남도","region":"충청","d":"M156.5,236.7L158.7,239.8L153.6,238.5L152.7,237.2ZM150.7,214L152.7,214.7L153.8,217.1L153.1,220.2L153.6,223.4L156.1,229.1L156.7,233.4L155.4,234.8L152.4,233.5L151.5,234.3L148.8,231.4L147.9,228.5L148.5,226.2L147.5,219.5L146.6,218.4L146.6,216.8L149,214.4ZM195,184.8L202.1,181.7L205,182.5L208.4,181.4L211.6,178L213,178.8L214.1,178.1L218.8,180.1L220.2,182.3L224.3,184L227.4,186.8L227.2,189L229.6,189.8L229.4,192.2L231.2,192.4L234.9,195.8L234.4,196.9L235.8,198.1L235.8,199.6L234.5,200.6L233.8,199.4L229.6,200L230,202.1L228.7,202L227.4,203.2L227.4,204.8L225.5,206.2L222.5,205.8L218.9,202.8L215.6,201.9L213.3,204.6L214,206.1L215.4,206.1L215.7,207.5L214.9,208.8L215,214.7L217.1,215.7L218,217.2L218.1,218.8L216.4,221.7L217.1,223.1L216.2,224.1L219,229.4L218.7,231.1L223.3,234.5L225.3,233.8L225.2,237.8L224.3,239.2L224.9,240.4L223.4,242.6L223.4,245.7L222.6,247L225.2,248.8L225.3,251.7L227.9,253.2L230,256.4L231.9,253.3L231.6,248.9L232.6,248.1L233.9,248.8L233.7,250.2L235.5,254L238.3,255.9L240.3,253.8L240.2,253L245.4,250.4L249.3,252L250.8,253.6L250.4,255.8L251.1,259.1L250.2,261.9L254,268.5L252.9,268.6L252.5,271.1L253.5,271.2L252.4,274.5L251,274.1L250.3,272.8L245.9,272L245.6,276.1L241.9,277.5L240.3,276.5L239.3,276.9L236.9,272.7L234.9,274.5L232.7,271.9L231.6,270L231.1,264.5L229.8,262.2L227.2,262.7L226.2,264L224.5,264.5L222.8,264L222.3,265.8L219,265.3L218.6,266.7L216.9,265.9L216.1,266.9L213.5,266.6L213.2,268.3L209,267.5L207.4,265.9L206.4,261.1L204.3,261.6L202.7,260.4L201.6,260.8L198.9,259.7L196.2,261.4L193.7,261.2L192.2,264L191.4,269.2L187.1,271.9L182.1,272.9L181,275.2L175,274.2L175.5,272.1L173.6,269.7L172.7,269.7L172.8,266L168.2,261.5L166.8,262.3L165,260.5L163,260.1L163.9,256.8L165.4,255.6L164.4,251.4L165.8,248.9L162.2,242.8L166.1,240.5L162.7,237.3L160.4,237L161.7,232.6L159.8,225L160.7,223.7L158.9,221.4L157.7,216.7L158,215.6L160,214.7L159.9,213.6L158.5,212.7L159.4,209.9L158.8,208.8L157.3,208.6L157.5,210.9L155.8,215.3L151,212.6L150.7,208.4L149.1,208.5L150.3,212.6L145.2,216.9L144.3,215.7L145.5,212.3L144.6,208.9L142.8,207.9L143.4,202.7L140,206L138.7,206L137.5,207.8L135.5,207.5L132.1,208.5L132,206.5L133.4,206.6L133.3,204.9L135.4,203.4L138.3,204.7L139.4,203.1L137.9,202.6L136.5,200L134.8,199.5L133.4,200.2L133.8,202.2L132.5,203.4L131.4,202.6L132.3,201.2L129.7,198L132,197.8L133,196.4L134.3,192.7L133.3,191.4L134.7,190.6L135.7,191.7L137.2,190.4L136.7,188.5L138.4,185.2L141.6,184.1L141.1,186.4L139.4,187.2L141.1,188.9L142,187.3L143.3,186.9L145.2,182.3L144.5,178.9L146.5,177.9L146.9,179.8L146,180.9L146,183.1L147.4,184.7L147.4,186.1L145.3,191L147.2,191.4L144.2,193.5L145.6,194.4L148.8,193.5L147.5,191.5L147.8,189.6L149.2,190.4L150.9,190.2L151.6,188.8L150.9,187.6L154.7,184.5L152.3,180.9L148.5,179.3L148.9,177.8L147.8,175.9L151.9,174.1L156,173.8L158,174.7L160.2,178.4L160.9,177L158.2,172.7L161.8,168.8L163.5,169.3L164.3,170.9L173.3,175.5L178.5,175.3L184.7,177.6L186.4,182.8L187.2,182.8L188.8,189.1L190.1,187.5L195.3,186.2Z"},{"name":"충청북도","region":"충청","d":"M336.1,168.7L334.3,171.4L330.6,170.9L329.1,172.1L329.6,173.7L327.4,176L325,176.6L324.9,177.6L319.1,182.5L319,185.1L317.7,187.6L319.6,188.8L319.7,190.4L317.4,194.1L314.2,193.9L313,195.2L310.4,193.6L309.3,193.8L306.2,189.6L302.9,188L302.2,190.5L300.6,190.4L301,193.8L296.7,193.3L294.6,191.9L292.4,193.4L292,194.7L290.1,194.9L288.1,193.7L286,200.5L288.9,203.1L289.1,204.6L287.2,204.5L285.1,202.7L282.3,203.5L280.2,201.6L277.8,204.7L277.8,206L274.2,206.2L277.9,208.8L277.8,213.5L274.4,212.3L273.1,209.8L272.2,211.8L271,212L271.2,214L269.1,214L267,216.2L269.1,218.2L272.1,218.5L273.1,219.8L273.1,221.5L275.3,222.8L275.8,224.5L273.7,227.2L273.1,231.6L273.8,233.1L273.1,234.7L274.5,239.6L271.4,242.3L270.5,244.3L271.3,247.7L273.6,247.8L274.6,246.1L277.7,247.5L279.2,249.6L280.7,250.2L284.2,248.1L287.1,249.6L285.8,251.3L287.6,255.2L286.4,255.9L284.4,254.4L282.2,255.3L281.4,256.5L283,260L282.3,262.4L280.7,263.5L279.9,265.8L280.2,268.5L278.1,270.2L276.6,269.9L273.4,273.1L271.5,271.4L267.2,272.6L266.2,273.9L259.5,272L258.8,269.7L257.8,269.1L255.8,271.4L255.4,269.7L250.2,261.9L251.1,259.1L250.4,255.8L250.8,253.6L249.3,252L245.4,250.4L242.3,251.5L241.8,249.4L243,242L245.1,238.4L244.9,236.6L247.3,235.4L246.3,233.2L244.1,233.1L243.1,234.5L242,232L243.1,230.4L241.2,229.5L239.1,230.3L235,229.7L235.1,227L234.4,226.1L235.3,225.8L235.5,222.9L234.9,221.2L233.5,221.1L232.6,219.3L229.7,219L228.7,217.2L227.4,216.9L226.8,213.7L225,211.8L227.3,207.1L225.5,206.2L227.4,204.8L227.4,203.2L228.7,202L230,202.1L229.6,200L233.8,199.4L234.5,200.6L235.8,199.6L235.8,198.1L234.4,196.9L234.9,195.8L231.2,192.4L229.4,192.2L229.6,189.8L227.2,189L227.4,186.8L225.9,185.9L227.4,182.4L230.7,180L233.1,180.1L234.9,178.5L233.6,176.8L234.3,175.5L237.2,175.1L239.5,173.2L239.5,170.9L241.8,169.9L242.8,170.5L244.2,169.5L247.1,170.9L248.3,170.6L248.2,169L253.5,165.7L254,161.2L258,161.8L262.9,153.6L263.4,157.7L266.3,160.8L273,158.9L275.4,160.1L278.2,156.4L277,152.7L279.1,150.6L282.1,149.5L284.9,150.8L284.9,151.9L286.5,153.7L285.7,155.1L286.5,156.4L289.7,155.9L293.5,153.2L297.3,153.4L297.4,152L299.6,150.4L301.8,152.5L303.8,152.5L305.1,154.5L308.9,152.9L310.3,153.7L309.7,155.6L304.7,159.2L305.5,160.6L307.1,161.5L310.6,159.5L315.8,160.6L315.4,162.4L317.6,164L321.5,164.3L322.7,163.3L324.8,163.9L325,165L326.9,166.3Z"},{"name":"강원도","region":"강원, 제주","d":"M393.7,160.6L391.7,160.8L388.8,162.4L388.1,163.8L386.2,163.6L385.8,165.1L382.5,167.9L383.1,170.8L380,171.2L375.6,167.1L372,165.2L370.4,166L369.5,168.5L362.9,166.9L361,167.5L359.8,165.8L358,166.1L355.8,170.8L351.8,170.1L350.2,167.5L346.9,166.5L344.2,169.5L345,171.8L344.2,172.4L342.8,171.3L340,171.2L339.1,170L334.2,167.8L326.9,166.3L325,165L324.8,163.9L322.7,163.3L321.5,164.3L317.6,164L315.4,162.4L315.8,160.6L310.6,159.5L307.1,161.5L304.7,159.2L309.7,155.6L310.3,153.7L308.9,152.9L305.1,154.5L303.8,152.5L301.8,152.5L299.6,150.4L297.4,152L297.3,153.4L293.5,153.2L289.7,155.9L286.5,156.4L285.7,155.1L286.5,153.7L284.9,151.9L284.9,150.8L282.1,149.5L279.1,150.6L277,152.7L278.2,156.4L275.4,160.1L273,158.9L266.3,160.8L263.4,157.7L262.6,154.2L263,150.5L263.8,149.5L263.5,145.5L264.6,144.5L263.9,138.6L265.3,138.2L266.7,132.9L267.5,132.4L265,124.7L267.7,121.8L270.6,121.4L271.2,120L268.2,118.8L266.6,116.7L264.4,117L263.4,116.1L259.7,116.6L258.8,115.2L251.2,110.1L249.3,112L247.7,112.4L245.9,111L247.2,109.1L246.9,106.7L247.9,103.2L246.2,103.4L243.5,102.2L246.5,99.2L244.6,96.1L245.8,94.4L245,92.9L245.5,91.1L249.7,87.7L251.1,87.8L252.4,84.6L252.1,81.3L251.2,79.8L246.5,78.5L246.1,75.2L243,75.3L239.5,73.7L238.3,69.4L238.1,64.5L237.3,63.8L235.8,65.1L235.1,64L233.5,63.8L228.4,65.8L227.6,63.7L225.3,63.6L224.7,61.6L225.7,60L225.8,57.6L224.4,57.1L223.1,59L220.5,60.6L217.8,59.2L215.9,55.3L215.6,52.1L214.4,51L213,52L211.3,51.1L211.3,46.1L213.5,44.3L214,42.4L215.3,41.8L217.2,43.6L222.1,41.4L226.2,42.5L227.6,43.6L229.8,42.1L233.8,41.3L236.8,41.8L238.8,43.5L240.9,43.5L241.8,44.9L243.6,44.9L246.2,42.7L250,41.3L254.1,42.4L258.3,42L259.1,40.9L261.5,41.5L265.3,39.9L267.3,42.7L274,40.9L281.5,43.2L288.5,43.9L300.8,37L306.2,31.7L307.7,28.1L308.5,16.1L309.3,14.3L311.7,13.9L315.5,18.6L318.9,27.5L321.2,30.1L320.2,30.6L320.4,32.3L325.1,38.1L325.9,41.4L327.9,43.9L331.1,51L330.8,52.2L332.6,56.9L332.7,60.2L337.3,66.1L338.2,68.7L342.1,72.9L345.9,79.8L347.3,80.8L347.3,81.8L350.9,85.5L350.5,86.8L354.5,92.3L368.8,107.7L368.9,109.2L367.8,111L368.6,113.1L373.7,117.6L374.1,119.6L373.4,121.3L374.1,123.2L379.4,129.7L380.3,133.7L384.5,137.2L386.1,143L388.7,144.9L388.6,146L390.9,147.2L390.7,148.7L393.1,151.7L391.9,152.7L391.9,157.5Z"},{"name":"경기도","region":"경기","d":"M170.7,144.4L167.7,147.3L170.8,149L171.9,151.6L174.1,152.7L173.8,154.2L171,153.4L170.3,154.5L168.9,153.2L167.5,154.9L165.6,154.6L165.3,152.8L166.9,151.1L167.1,149.7L165.9,147.3L167.5,147.1ZM262.9,153.6L258,161.8L254,161.2L253.5,165.7L248.2,169L248.3,170.6L247.1,170.9L244.2,169.5L242.8,170.5L241.8,169.9L239.5,170.9L239.5,173.2L237.2,175.1L234.3,175.5L233.6,176.8L234.9,178.5L233.1,180.1L230.7,180L227.4,182.4L225.9,185.9L224.3,184L220.2,182.3L218.8,180.1L214.1,178.1L213,178.8L211.6,178L208.4,181.4L205,182.5L202.1,181.7L195,184.8L194.7,182.7L193.3,181.7L191.4,182L191.3,180.4L188.2,175.7L186,174.5L185.4,172.4L182.3,172.4L182.1,170.4L183.8,165L182.9,164.2L183.7,162.5L185.8,162.4L186.6,160.1L185.5,157.8L184.5,158.8L181.9,158.7L180.4,161.4L177.2,163.7L176,161.5L176.7,160.4L175,159.1L175.4,154.4L176.3,152.9L175.3,151.6L177.1,149L185.4,150.8L185.4,148.6L188.3,146.4L186.6,145.7L184,146.3L180.2,145.1L180,143.9L177.5,141.9L177.2,140.4L182.5,133L183.7,132.5L184.5,130.2L183.7,128.1L181.6,126.6L181.8,123.9L183,123.6L183.6,119.9L188,121.2L188.5,122.6L187.4,126L188,127.7L189.4,127.7L191.7,125.9L194.6,131.9L196.4,130.4L197.5,131.7L199.4,131.2L202.7,128.6L203.3,129.7L205.4,129.6L205.3,131.2L207.7,132.4L210.4,129.4L214.3,127.6L215.5,125.3L213.7,124.4L215.6,120.8L216.9,120.6L217.1,119.2L216.5,117.3L210.6,119.3L210.6,116.9L212,114.8L211.2,110.8L209.9,110.3L210.1,106.4L209,105.6L206.5,106.5L203.7,105.2L203.1,106.8L201.9,107.5L200.8,109.8L201.2,111.6L200.4,112.1L198.2,109.4L195.3,110.8L194.5,115.8L192.4,117.3L190.4,117.7L186.7,114.9L185.7,117.1L180.2,116.1L178,113.5L174.7,111.5L173,112.5L172.3,114.6L167.8,116.5L164.3,110L164.8,108.6L163.8,107.6L164.2,105L163.5,104L164.2,100.4L163.1,98.6L164.9,98.1L166.4,98.4L167.4,99.7L170.8,100L175.1,96.3L176,92.2L174.9,91.4L177.5,88.6L175.9,86.6L176.3,85.5L175.4,83.2L176,79.7L179.3,81.3L181.8,80.1L181.4,78L183.3,76.8L188.6,76L188.1,74.1L188.8,71.9L190.6,72.1L192.1,73.4L193.8,70.1L193.8,67.8L191.7,67.2L190.3,65.8L188.5,67.4L188,66.5L185.9,67.1L182,62.5L183.8,59.8L192.1,53L194,54.8L198.6,54.2L199.6,55.5L201.1,54.1L200.4,51.9L211.3,46.1L211.3,51.1L213,52L214.4,51L215.6,52.1L215.9,55.3L217.8,59.2L220.5,60.6L223.1,59L224.4,57.1L225.8,57.6L225.7,60L224.7,61.6L225.3,63.6L227.6,63.7L228.4,65.8L233.5,63.8L235.1,64L235.8,65.1L237.3,63.8L238.1,64.5L238.3,69.4L239.5,73.7L243,75.3L246.1,75.2L246.5,78.5L251.2,79.8L252.1,81.3L252.4,84.6L251.1,87.8L249.7,87.7L245.5,91.1L245,92.9L245.8,94.4L244.6,96.1L246.5,99.2L243.5,102.2L246.2,103.4L247.9,103.2L246.9,106.7L247.2,109.1L245.9,111L247.7,112.4L249.3,112L251.2,110.1L258.8,115.2L259.7,116.6L263.4,116.1L264.4,117L266.6,116.7L268.2,118.8L271.2,120L270.6,121.4L267.7,121.8L265,124.7L267.5,132.4L266.7,132.9L265.3,138.2L263.9,138.6L264.6,144.5L263.5,145.5L263.8,149.5L263,150.5Z"},{"name":"세종특별자치시","region":"충청","d":"M225.5,206.2L227.3,207.1L225,211.8L226.8,213.7L227.4,216.9L228.7,217.2L229.7,219L232.6,219.3L233.5,221.1L234.9,221.2L235.5,222.9L235.3,225.8L234.4,226.1L233.3,225.3L231.5,226.8L231,230.5L228.9,233.1L226.2,233.1L225.3,233.8L223.3,234.5L218.7,231.1L219,229.4L216.2,224.1L217.1,223.1L216.4,221.7L218.1,218.8L218,217.2L217.1,215.7L215,214.7L214.9,208.8L215.7,207.5L215.4,206.1L214,206.1L213.3,204.6L215.6,201.9L218.9,202.8L222.5,205.8Z"},{"name":"울산광역시","region":"경남","d":"M400.7,310.2L399.9,312.2L401.7,314.9L401.9,316.7L400.9,318.1L401.3,319.4L399.8,326.7L395.3,327.8L392.6,330.5L393.7,331.1L393.6,334.2L392.2,337.7L393.3,339.7L390.3,340.7L388.9,342.4L386.9,341.2L387.2,339L385.7,336.7L381.9,337.4L380.7,336.5L382,334.4L380.1,331.4L377.2,331.8L373.1,327.3L372.9,325.8L363.8,322.4L361.9,319.2L365.9,316.9L365.9,313.8L364.5,313.3L368.1,310.3L370.2,311.3L369.9,307.2L371.4,305.1L375.2,304.1L376,302.8L377.2,303.8L381,303.2L385.5,306.2L384.8,308.7L385.3,309.9L388.7,310.5L392.9,307.3Z"},{"name":"대전광역시","region":"충청","d":"M242.3,251.5L240.2,253L240.3,253.8L238.3,255.9L235.5,254L233.7,250.2L233.9,248.8L232.6,248.1L231.6,248.9L231.9,253.3L230,256.4L227.9,253.2L225.3,251.7L225.2,248.8L222.6,247L223.4,245.7L223.4,242.6L224.9,240.4L224.3,239.2L225.2,237.8L225.3,233.8L226.2,233.1L228.9,233.1L231,230.5L231.5,226.8L233.3,225.3L235.1,227L235,229.7L239.1,230.3L241.2,229.5L243.1,230.4L242,232L243.1,234.5L244.1,233.1L246.3,233.2L247.3,235.4L244.9,236.6L245.1,238.4L243,242L241.8,249.4Z"},{"name":"광주광역시","region":"전라","d":"M194.9,349.4L196.8,350.2L200.4,356.6L202.6,356.5L204.1,358.6L203.1,359.8L203.2,362.9L201.4,365.9L199.7,366.4L198.5,368L197,367.9L196.1,366.3L192,367.9L190.7,367.5L187.8,370.1L185.9,369.2L184.5,370L183.2,366.2L181.4,364.6L177.1,364.1L176.4,364.7L174.2,363.3L174.4,358.8L175.8,358.4L174.9,356.1L176.4,355.9L177.1,353.8L178.4,354.5L179.6,354.1L181.1,350.1L183.3,349.9L182.6,351.9L186.7,353.4Z"},{"name":"인천광역시","region":"경기","d":"M130.2,148L133.2,151.4L134.5,151.7L133,153.9L131,154.4L130.6,153.1L128.9,152.3L128.8,150.6ZM159.6,146.5L161.1,147L162.1,149.5L160.5,150.3L158.6,152.7L156.4,151.8L156.9,148ZM154.8,134.1L157.2,136.7L156.7,138.2L154.9,138.7L153.8,135.2ZM168.3,125.2L168.9,126.3L162.6,128.7L161.7,130.5L157.3,133.2L155.5,133.1L153.5,130.7L151.6,130.5L150.3,128.6L156.5,124.9L160.6,124.9L161.8,122.1L167.3,123.8ZM158.8,120.8L159.9,121.5L159.3,124.2L156.4,122.7ZM146.5,119.2L150.7,122.2L148.1,122.6L148.1,121.2ZM185.7,117.1L183.6,119.9L183,123.6L181.8,123.9L181.6,126.6L183.7,128.1L184.5,130.2L183.7,132.5L182.5,133L180.5,136.5L175,141L171.5,141L171,137.9L169.9,136.8L169.5,128.9L170.6,119.9L167.8,116.5L172.3,114.6L173,112.5L174.7,111.5L178,113.5L180.2,116.1ZM98.5,107.3L98.1,108.7L95.9,109.9L95.9,107.2ZM137.3,106.4L138.6,108.6L138.1,109.7L135.9,108.3ZM148.1,100.3L147.5,103.7L149.5,105.4L151.6,105.8L152,108.5L149.3,110.9L147.8,111.1L147.2,107.1L143.4,104.4L144.6,103.5L144.9,100.9ZM143,93.7L148.6,95.4L147.1,97.8L145.2,98.8L143.5,98.3L139.9,100L138.3,98.4L140.7,93.6ZM164.1,101.5L163.8,107.6L164.8,108.6L164.4,111.4L165.8,114.8L163.9,115.6L163.3,117.3L162,116.3L160.4,116.9L159.8,115.5L154.2,115.9L152.1,114.3L151.6,112L154.3,110.2L152.8,106.3L150,104.7L149.3,103.2L149.1,100.4L150.2,99.4L149.7,96.1L153.4,92.7L156.8,92.2L159.1,94.8L162.6,96.9ZM16.9,90.6L18.1,90.6L17.3,94.6L15,94.7L14.7,93.1ZM15.2,77.1L18.7,77.4L18.8,79.9L17,80.9L16,83.7L11.2,82.9L9.2,79.2L9.4,77.6L11.3,78.4Z"},{"name":"대구광역시","region":"경북","d":"M325.9,307.1L324.5,307.8L324.2,311.4L319.5,311.5L318.3,313L314.2,314.6L313.3,314.2L314.5,314.1L315.9,311.1L312.1,307.2L311.7,305L312.4,304.6L317.1,306L318.4,305L318.3,302.8L315.1,300.7L314.6,299L317.3,294.4L321.3,294.5L322,292.6L320.6,291.2L317.5,290.2L314.9,290.3L314.5,288.8L317.2,283.2L319,281.8L321.8,281.7L321.1,284.6L321.8,285.8L323.2,285.7L325.7,283.5L326.6,281.3L326,277.7L328.3,278.2L331.1,277.4L333.3,274.7L339.2,273.8L342,274.8L343.7,278.2L343.1,282.5L344.5,283.8L345.1,286.9L344.1,289.6L340.7,292.6L341.3,294.7L338.5,296.3L339.6,299.5L339.3,302.1L338.6,303.1L333.7,305L332.7,302.8L333.2,301.6L330.3,301.4L327.3,303.4Z"},{"name":"부산광역시","region":"경남","d":"M388.9,342.4L385.7,343.4L385.3,347.2L383.9,348.9L384.7,350.6L382.4,356.7L380.3,357.5L380,359.2L375.3,359.9L374,361.9L374.6,364.3L374.1,365.3L371.9,365.4L369.7,364.5L369.5,363L368.3,363L367.5,364.5L369.8,365.7L370.7,368.2L372,369.3L371,370.3L367.1,366.8L366,369.1L364.3,370.5L362.8,370.5L361.6,372L360.3,367.5L357.9,366.7L357.1,367.4L350.9,367.3L352.1,370.1L352.1,372L351,374L348.5,373.3L349,371.3L347.8,369.9L349.7,369.2L350.5,368L349.9,365.4L351.5,364.6L350.7,362.4L348.2,361.1L347.6,359.5L351.6,359.5L353.4,358.6L354.7,357.1L353.8,355.1L354.9,353.9L364,351.9L365.3,348L368.3,347.3L369.1,345.8L370.2,346.3L373.3,344.4L374.5,340.8L376.2,338.9L378.4,340.2L379.9,339.2L380.7,336.5L381.9,337.4L385.7,336.7L387.2,339L386.9,341.2Z"},{"name":"서울특별시","region":"서울","d":"M183.6,119.9L186.7,114.9L190.4,117.7L194.5,115.8L195.3,110.8L198.2,109.4L200.4,112.1L201.2,111.6L200.8,109.8L203.7,105.2L206.5,106.5L209,105.6L210.1,106.4L209.9,110.3L211.2,110.8L212,114.8L210.6,116.9L210.6,119.3L216.5,117.3L217.1,119.2L216.9,120.6L215.6,120.8L213.7,124.4L215.5,125.3L214.3,127.6L210.4,129.4L207.7,132.4L205.3,131.2L205.4,129.6L203.3,129.7L202.7,128.6L199.4,131.2L197.5,131.7L196.4,130.4L194.6,131.9L191.7,125.9L189.4,127.7L188,127.7L187.4,126L188.5,122.6L188,121.2Z"}],"pts":{}};
+/* ---------- Supabase 연결 ---------- */
+const SB_URL='https://ysuwqpxrwrxgjttyumbe.supabase.co';
+const SB_KEY='sb_publishable_ohDZ3-V45FpivcNVbdr4nA_IiATwDmH';
+const ALLOWED_DOMAIN='rnrvh.com';
+const sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const CL={use:async()=>null}; // 테스트 버전의 claude.ai 전용 기능 자리 (정식 버전에서는 사용 안 함)
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const SLACK_CH='C053JNFRU76';
+const TODAY=(()=>{const d=new Date();d.setHours(0,0,0,0);return d})();
+const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const TISO=iso(TODAY);
+const pd=s=>{if(!s)return null;const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c)};
+const md=s=>{const d=pd(s);return `${d.getMonth()+1}/${d.getDate()}`};
+const addDays=(s,n)=>{const d=pd(s);d.setDate(d.getDate()+n);return iso(d)};
+const DOW='일월화수목금토';
+const SHORT={'롯데시네마':'L','롯데시네마 직영':'L직','메가박스':'M','메가박스 직영':'M직','CGV':'C','모노플렉스':'모노'};
+
+let db=null,userNs=null,canWrite=null,me=null;
+let base={year:new Date().getFullYear(),asOf:'',sources:{plan:'',maint:''},visits:[],sites:[],new27:[],calIssues:[],maintLog:[],maintChanges:[]}, status={}, extra={}, slackSeen={}, calM=null;
+let STAFF=['김영용','장민규','이근화','김효석','박성범','정인영','이민석','박노찬','맹준형'];
+let year=+(new URLSearchParams(location.search).get('year'))||new Date().getFullYear();
+const skey=(b,s)=>b+'|'+s;
+
+function eff(v){
+  const s=status[v.id]||{};
+  const x={...v,done:s.done??v.done,date:s.date!==undefined?s.date:v.date,month:s.month??v.month,visitors:s.visitors??v.visitors,memo:s.memo||'',confirmed:!!(s.confirmed??v.confirmed),src:s.source||(v.extra?'web':null),updatedAt:s.updatedAt||null};
+  // 웹에서 날짜를 지웠거나 다른 달로 옮기면 시트 달력 계획일은 더 이상 쓰지 않음
+  if(s.noPlan||(!x.date&&s.month&&x.planned&&+x.planned.slice(5,7)!==s.month)) x.planned=null;
+  if(!x.done&&!x.date&&x.planned&&x.planned<TISO){x.droppedPlan=x.planned;x.planned=null}
+  x.when=x.date||x.planned||null;
+  // 완료도 확정도 아닌 날짜는 모두 '계획' (달력 계획일 또는 시트·웹에서 넣은 날짜)
+  x.isPlanned=!x.done&&!x.confirmed&&!!x.when; x.planKind=x.isPlanned?(x.date?'계획':'계획(달력)'):'';
+  if(x.date) x.month=pd(x.date).getMonth()+1;
+  const d=pd(x.when);
+  x.state=x.done?'done':d?(x.when>=TISO?'sched':'late'):(x.month?(x.month<TODAY.getMonth()+1?'late':'sched'):'tbd');
+  if(!d && x.state==='sched') x.state='tbd2';
+  return x;
+}
+function allVisits(){
+  const ex=Object.entries(extra).filter(([,e])=>!e.deleted).map(([id,e])=>({id,brand:e.brand,site:e.site,region:e.region||'',halls:e.halls||null,half:e.half||'',month:e.month||null,date:e.date||null,planned:null,visitors:e.visitors||'',done:!!e.done,confirmed:!!e.confirmed,note:e.memo||'',extra:true}));
+  return [...base.visits,...ex].map(eff);
+}
+const label=e=>`${SHORT[e.brand]?SHORT[e.brand]+' ':''}${e.site}${e.half?` (${e.half.slice(0,1)})`:''}`;
+const stName={done:'완료',sched:'예정',late:'지연',tbd:'미정',tbd2:'미정'};
+const stCls=s=>s==='tbd2'?'tbd':s;
+
+/* ---------- 유지보수 계약 판정 ---------- */
+function judgeSites(V){
+  const by={}; V.forEach(v=>(by[skey(v.brand,v.site)]??=[]).push(v));
+  const out=[];
+  for(const s of base.sites){
+    const vs=by[skey(s.brand,s.site)]||[];
+    const cnt=vs.length, done=vs.filter(v=>v.state==='done').length;
+    const left=vs.filter(v=>v.state!=='done');
+    const next=left.map(v=>v.when).filter(Boolean).sort()[0]||null;
+    const mono=s.brand.startsWith('모노')&&!s.inMaint;
+    const ic=mono?1:(s.maintInsp==='2회'?2:s.maintInsp==='1회'?1:0);
+    const J=[];
+    if(cnt>0){
+      if(mono){ if(cnt!==1) J.push(['warn',`횟수 다름 (모노 기본 1 / 일정 ${cnt})`]); else J.push(['ok','일치 (모노 기본 연 1회)']); }
+      else if(!s.inMaint) J.push(['info','계약표에 없음']);
+      else{
+        if(!ic) J.push(['warn','정기점검 '+(s.maintInsp||'빈칸')]);
+        else if(ic!==cnt) J.push(['warn',`횟수 다름 (계약 ${ic} / 일정 ${cnt})`]);
+        if(s.maintEnd){
+          if(s.maintEnd<TISO) J.push(left.length?['bad','계약 종료 후 남은 방문']:['info','계약 종료, 올해 점검 완료']);
+          else if(next && s.maintEnd<next) J.push(['bad','방문 전 계약 종료']);
+          else if(s.maintEnd<=addDays(TISO,60)) J.push(['warn','60일 내 계약 종료']);
+        }
+      }
+    }else if(s.inMaint && ic && s.status==='운영' && (!s.maintEnd||s.maintEnd>=TISO)){
+      J.push(['bad','계약 있는데 일정 없음']);
+    }else continue;
+    if(!J.length) J.push(['ok','일치']);
+    out.push({...s,cnt,done,left:left.length,next,J,maintInsp:mono?'1회 (모노 기본값)':s.maintInsp,desc:mono?'모노플렉스 기본값 연 1회 (계약표 미기재)':s.desc});
+  }
+  return out;
+}
+
+/* ---------- render ---------- */
+function render(){
+  const V=allVisits(), S=judgeSites(V);
+  const done=V.filter(v=>v.state==='done').length;
+  $('#title').textContent=`${year}년 정기점검 현황`;
+  $('#bigNum').innerHTML=`${done}<small>/ ${V.length}회 완료</small>`;
+  const c=k=>V.filter(v=>v.state===k).length;
+  $('#bigSub').textContent=`${new Set(V.map(v=>skey(v.brand,v.site))).size}개 사이트, 남은 점검 ${V.length-done}회 (예정 ${c('sched')}, 지연·결과 미입력 ${c('late')}, 날짜 미정 ${c('tbd')+c('tbd2')}) · 진행률 ${(done/V.length*100).toFixed(1)}%`;
+  renderReel(V); renderAlerts(S); renderNow(V); renderCal(V); renderPlan(V,S); renderRegion(V); renderMap(V); renderMaint(S); renderCheck(S); renderN27();
+}
+function renderReel(V){
+  const cols=[],labs=[];
+  for(let m=1;m<=12;m++){
+    const list=V.filter(v=>v.month===m).sort((a,b)=>(a.when||'9').localeCompare(b.when||'9'));
+    cols.push(`<div class="mcol"><div class="ticks">${list.map(e=>`<button class="tick ${stCls(e.state)}" data-id="${e.id}" title="${esc(label(e))} ${e.when?md(e.when):m+'월'}" aria-label="${esc(label(e))}"></button>`).join('')}</div></div>`);
+    labs.push(`<span class="${year===TODAY.getFullYear()&&m===TODAY.getMonth()+1?'cur':''}">${m}월</span>`);
+  }
+  let beam='';
+  if(year===TODAY.getFullYear()){const m=TODAY.getMonth(),dim=new Date(year,m+1,0).getDate();beam=`<div class="beam" style="left:calc(${((m+(TODAY.getDate()-.5)/dim)/12)*100}% - 1px)" data-label="오늘 ${m+1}/${TODAY.getDate()}"></div>`}
+  $('#months').innerHTML=cols.join('')+beam; $('#mlabels').innerHTML=labs.join('');
+}
+let maintFilter='';
+function renderAlerts(S){
+  const n=t=>S.filter(s=>s.J.some(j=>j[1].startsWith(t))).length;
+  const A=[['bad','계약 종료 후 남은 방문'],['bad','방문 전 계약 종료'],['bad','계약 있는데 일정 없음'],['warn','60일 내 계약 종료'],['warn','정기점검 '],['warn','횟수 다름'],['info','계약표에 없음']];
+  $('#alerts').innerHTML=A.map(([k,t])=>{const c=n(t);return c?`<button class="al ${k}" data-jf="${esc(t)}"><b>${c}</b>${esc(t.trim()==='정기점검'?'계약 정기점검 X/빈칸':t)}</button>`:''}).join('')+`<button class="al" data-jf="일치"><b>${n('일치')}</b>계약 일치 (모노 기본값 포함)</button>`+(recentChanges().length?`<button class="al warn" id="chgChip"><b>${recentChanges().length}</b>최근 ${CHG_DAYS}일 계약 변경</button>`:'');
+  const cc=document.getElementById('chgChip'); if(cc) cc.onclick=()=>{openTab('maint');$('#chgPane').scrollIntoView({behavior:'smooth'})};
+  document.querySelectorAll('[data-jf]').forEach(b=>b.onclick=()=>{maintFilter=b.dataset.jf;$('#mJudge').value=maintFilter;openTab('maint');render()});
+}
+function itemHTML(e){
+  return `<button class="item" data-id="${e.id}"><span class="d">${e.when?(e.isPlanned?'<i>':'')+md(e.when)+' '+DOW[pd(e.when).getDay()]+(e.isPlanned?'</i>':''):(e.month?e.month+'월 계획':'미정')}</span><span><b>${esc(label(e))}</b>${e.halls?` ${e.halls}관`:''}<br><span class="m">${esc(e.visitors||'점검자 미정')} · ${esc(e.region)}${e.confirmed&&!e.done?' · 확정':''}${e.isPlanned?' · '+e.planKind:''}${!e.when&&e.month?' · 날짜 미정':''}</span></span></button>`;
+}
+function renderNow(V){
+  const s=new Date(TODAY);s.setDate(s.getDate()-s.getDay());
+  const a=iso(s),b=addDays(a,7),c2=addDays(a,21);
+  const wk=V.filter(v=>v.when&&v.when>=a&&v.when<b).sort((x,y)=>x.when.localeCompare(y.when));
+  const nx=V.filter(v=>v.state!=='done'&&v.when&&v.when>=b&&v.when<c2).sort((x,y)=>x.when.localeCompare(y.when));
+  const lt=V.filter(v=>v.state==='late').sort((x,y)=>(x.when||'').localeCompare(y.when||''));
+  $('#wkRange').textContent=`${md(a)}–${md(addDays(a,6))}`;
+  $('#thisWeek').innerHTML=wk.map(itemHTML).join('')||'<div class="empty">이번 주 잡힌 점검이 없습니다.</div>';
+  $('#nextWeeks').innerHTML=nx.map(itemHTML).join('')||'<div class="empty">다음 2주 잡힌 점검이 없습니다.</div>';
+  $('#lateCnt').textContent=lt.length+'건';
+  $('#lateList').innerHTML=lt.map(itemHTML).join('')||'<div class="empty">밀린 점검이 없습니다.</div>';
+}
+function renderCal(V){
+  if(calM===null) calM=year===TODAY.getFullYear()?TODAY.getMonth():0;
+  $('#calTitle').textContent=`${year}년 ${calM+1}월`;
+  const first=new Date(year,calM,1),start=new Date(first);start.setDate(1-first.getDay());
+  if($('#cRegion').options.length<2) fillSel($('#cRegion'),REGIONS().map(r=>[r,r]),'전체 지역');
+  const cr=$('#cRegion').value; if(cr) V=V.filter(v=>v.region===cr);
+  const byDay={};V.forEach(e=>{if(e.when)(byDay[e.when]??=[]).push(e)});
+  let h=[...DOW].map(d=>`<div class="dow">${d}</div>`).join('');
+  for(let i=0;i<42;i++){
+    const d=new Date(start);d.setDate(start.getDate()+i);
+    if(i===35&&d.getMonth()!==calM)break;
+    const evs=byDay[iso(d)]||[];
+    h+=`<div class="day ${d.getMonth()!==calM?'out':''} ${+d===+TODAY?'today':''}"><div class="n">${d.getDate()}</div>${evs.map(e=>`<button class="ev ${stCls(e.state)} ${e.isPlanned?'planned':''}" data-id="${e.id}"><span>${esc(label(e))}${e.halls?` ${e.halls}관`:''}</span></button>`).join('')}</div>`;
+  }
+  const nod=V.filter(v=>!v.when&&v.month===calM+1);
+  $('#cal').innerHTML=h;
+  $('#cal').insertAdjacentHTML('afterend','');
+  const old=document.getElementById('calNoDate'); if(old) old.remove();
+  if(nod.length) $('.calwrap').insertAdjacentHTML('afterend',`<div id="calNoDate" class="nodate">${calM+1}월 날짜 미정 ${nod.length}건: ${nod.map(e=>`<button class="vis ${stCls(e.state)}" data-id="${e.id}">${esc(label(e))}</button>`).join('')}</div>`);
+}
+const REGIONS=()=>[...new Set(base.visits.map(v=>v.region).filter(Boolean))].sort();
+function fillSel(sel,opts,allLabel){const cur=sel.value;sel.innerHTML=`<option value="">${allLabel}</option>`+opts.map(([v,t])=>`<option value="${esc(v)}">${esc(t)}</option>`).join('');sel.value=cur}
+function renderPlan(V,S){
+  if($('#pBrand').options.length<2) fillSel($('#pBrand'),[...new Set(V.map(v=>v.brand))].sort().map(b=>[b,b]),'전체 브랜드');
+  if($('#pRegion').options.length<2) fillSel($('#pRegion'),REGIONS().map(r=>[r,r]),'전체 지역');
+  if($('#pMonth').options.length<2) fillSel($('#pMonth'),[...Array(12)].map((_,i)=>[i+1,(i+1)+'월']).concat([['none','월 미정']]),'전체 월');
+  const q=$('#pq').value.replace(/\s/g,''),fb=$('#pBrand').value,fm=$('#pMonth').value,fr=$('#pRegion').value;
+  const fs=new Set([...document.querySelectorAll('#pState input:checked')].map(i=>i.value));
+  const J={};S.forEach(s=>J[skey(s.brand,s.site)]=s.J);
+  const rows=V.filter(v=>(!q||v.site.replace(/\s/g,'').includes(q))&&(!fb||v.brand===fb)&&(!fr||v.region===fr)&&(!fm||(fm==='none'?!v.month:v.month==+fm))&&fs.has(stCls(v.state)))
+    .sort((a,b)=>(a.month||13)-(b.month||13)||(a.when||'9').localeCompare(b.when||'9'));
+  $('#pCount').textContent=`${rows.length}건`;
+  $('#planRows').innerHTML=rows.map(v=>{const j=(J[skey(v.brand,v.site)]||[]).filter(x=>x[0]!=='ok');return `<tr data-id="${v.id}" style="cursor:pointer"><td><span class="vis ${stCls(v.state)}">${stName[v.state]}</span></td><td class="small">${esc(v.region)}</td><td>${esc(v.brand)}</td><td>${esc(v.site)}${v.extra?' <span class="jd info">웹 추가</span>':''}</td><td>${esc(v.half||'연 1회')}</td><td class="num">${v.halls??''}</td><td>${v.when?(v.isPlanned?`<i>${md(v.when)}</i> <span class="note">${v.planKind}</span>`:md(v.when)+(v.confirmed&&!v.done?' <span class="jd ok">확정</span>':'')):(v.month?v.month+'월 계획':'미정')}</td><td>${esc(v.visitors||'')}</td><td class="small">${esc([v.note,v.memo].filter(Boolean).join(' / '))}</td><td>${j.map(x=>`<span class="jd ${x[0]}">${esc(x[1])}</span>`).join(' ')}</td></tr>`}).join('')||'<tr><td colspan="10" class="empty">조건에 맞는 방문이 없습니다.</td></tr>';
+}
+function renderRegion(V){
+  const R=REGIONS(), ms=[...Array(12)].map((_,i)=>i+1);
+  let h='<thead><tr><th>지역</th>'+ms.map(m=>`<th class="num">${m}월</th>`).join('')+'<th class="num">미정</th><th class="num">합계</th><th>진행</th></tr></thead><tbody>';
+  for(const r of R){
+    const vr=V.filter(v=>v.region===r), dn=vr.filter(v=>v.state==='done').length;
+    const cell=(list,m)=>{if(!list.length)return '<td class="num small">·</td>';const left=list.filter(v=>v.state!=='done').length;const late=list.some(v=>v.state==='late');return `<td class="num" style="cursor:pointer" data-rf="${esc(r)}" data-mf="${m}"><span style="${late?'color:var(--late);font-weight:700':left?'':'color:var(--ink2)'}">${left}</span><span class="small"> / ${list.length}</span></td>`};
+    h+=`<tr><td>${esc(r)}</td>`+ms.map(m=>cell(vr.filter(v=>v.month===m),m)).join('')+cell(vr.filter(v=>!v.month),'none')+`<td class="num">${vr.length-dn} / ${vr.length}</td><td><div class="bar"><i style="width:${vr.length?dn/vr.length*100:0}%"></i></div></td></tr>`;
+  }
+  $('#regionTbl').innerHTML=h+'</tbody>';
+  document.querySelectorAll('[data-rf]').forEach(td=>td.onclick=()=>{$('#pRegion').value=td.dataset.rf;$('#pMonth').value=td.dataset.mf;document.querySelectorAll('#pState input').forEach(i=>i.checked=true);$('#pq').value='';openTab('plan');const V2=allVisits();renderPlan(V2,judgeSites(V2))});
+  $('#regionLeft').innerHTML=R.map(r=>{const L=V.filter(v=>v.region===r&&v.state!=='done').sort((a,b)=>(a.when||'9'+String(a.month||13).padStart(2,'0')).localeCompare(b.when||'9'+String(b.month||13).padStart(2,'0')));return `<div class="pane"><h2>${esc(r)} <span>${L.length}건</span></h2>${L.map(itemHTML).join('')||'<div class="empty">남은 방문 없음</div>'}</div>`}).join('');
+}
+const CHG_DAYS=14;
+const recentChanges=()=>(base.maintChanges||[]).filter(c=>c.date>=addDays(TISO,-CHG_DAYS));
+function renderChanges(){
+  const L=base.maintLog||[], last=L[L.length-1];
+  $('#chgMeta').textContent=last?`마지막 확인 ${md(last.date)} · 시트 기준 ${last.sheetAt||''}`:'';
+  const C=[...(base.maintChanges||[])].sort((a,b)=>b.date.localeCompare(a.date));
+  const rows=C.map(c=>`<tr><td>${md(c.date)}${c.date>=addDays(TISO,-CHG_DAYS)?' <span class="jd warn">최근</span>':''}</td><td>${esc(c.brand+' '+c.site)}</td><td>${esc(c.type||'')}</td><td>${esc(c.item)}</td><td class="small">${esc(c.from||'—')}</td><td>→ ${esc(c.to||'—')}</td></tr>`).join('');
+  const log=L.slice(-5).reverse().map(l=>`<li>${md(l.date)} 확인: 변경 ${l.changes}건${l.note?' · '+esc(l.note):''}</li>`).join('');
+  $('#chgBody').innerHTML=(C.length?`<div class="tbl"><table><thead><tr><th>반영일</th><th>사이트</th><th>계약 형태</th><th>항목</th><th>이전</th><th>이후</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">아직 바뀐 계약 내용이 없습니다.</div>')+`<ul class="note" style="margin:8px 0 0;padding-left:18px">${log}</ul>`;
+}
+/* ---------- 지도 ---------- */
+let mapRegion='', mapSite='';
+const PB={}; // region bbox cache
+function regionBox(r){
+  if(PB[r]) return PB[r];
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  MAP.prov.filter(p=>!r||p.region===r).forEach(p=>{for(const m of p.d.matchAll(/([\d.]+),([\d.]+)/g)){const x=+m[1],y=+m[2];if(x<x0)x0=x;if(y<y0)y0=y;if(x>x1)x1=x;if(y>y1)y1=y}});
+  if(r==='강원, 제주'){y1=Math.max(y1,0)}
+  const pad=Math.max(x1-x0,y1-y0)*0.08; return PB[r]=[x0-pad,y0-pad,x1-x0+pad*2,y1-y0+pad*2];
+}
+function siteGroups(V){
+  const G={}; V.forEach(v=>{const k=skey(v.brand,v.site);(G[k]??={brand:v.brand,site:v.site,region:v.region,vs:[]}).vs.push(v)});
+  return Object.values(G).map(g=>{const left=g.vs.filter(v=>v.state!=='done');g.left=left.length;g.late=g.vs.some(v=>v.state==='late');g.next=left.map(v=>v.when).filter(Boolean).sort()[0]||null;g.pt=MAP.pts[g.site]||null;g.cls=g.late?'late':g.left?'sched':'done';return g});
+}
+function renderMap(V){
+  const G=siteGroups(V), onlyLeft=$('#mapLeftOnly').checked;
+  const vb=mapRegion?regionBox(mapRegion):[0,0,460,570]; const zf=vb[2]/460;
+  const svg=$('#map'); svg.setAttribute('viewBox',vb.map(n=>n.toFixed(1)).join(' '));
+  const prov=MAP.prov.map(p=>`<path d="${p.d}" class="prov${mapRegion&&p.region!==mapRegion?' dim':''}${p.region===mapRegion?' sel':''}" data-region="${esc(p.region)}" style="stroke-width:${(0.8*zf).toFixed(2)}"><title>${esc(p.region)}</title></path>`).join('');
+  const shown=G.filter(g=>g.pt&&(!onlyLeft||g.left)&&(!mapRegion||g.region===mapRegion));
+  const order={done:0,sched:1,late:2};
+  const dots=shown.sort((a,b)=>order[a.cls]-order[b.cls]).map(g=>{const r=(g.left?3.2+Math.min(g.left,3)*0.8:2.6)*zf;return `<circle class="dot ${g.cls}${mapSite===skey(g.brand,g.site)?' on':''}" cx="${g.pt[0]}" cy="${g.pt[1]}" r="${r.toFixed(2)}" style="stroke-width:${(0.9*zf).toFixed(2)}" data-site="${esc(skey(g.brand,g.site))}" tabindex="0"><title>${esc(g.brand+' '+g.site)} · 남은 ${g.left}회${g.next?' · 다음 '+md(g.next):''}</title></circle>`}).join('');
+  const labels=mapRegion?shown.filter(g=>g.left).map(g=>`<text x="${(g.pt[0]+4.5*zf).toFixed(1)}" y="${(g.pt[1]+1.6*zf).toFixed(1)}" style="font-size:${(4.2*zf*(vb[2]>200?1:1.5)).toFixed(2)}px" class="mlabel">${esc(g.site)}</text>`).join(''):'';
+  svg.innerHTML=prov+dots+labels;
+  svg.querySelectorAll('[data-region]').forEach(p=>p.onclick=()=>{mapRegion=p.dataset.region;mapSite='';renderMap(allVisits())});
+  svg.querySelectorAll('[data-site]').forEach(c=>{const f=()=>{mapSite=c.dataset.site;renderMap(allVisits())};c.onclick=e=>{e.stopPropagation();f()};c.onkeydown=e=>{if(e.key==='Enter')f()}});
+  const inR=G.filter(g=>!mapRegion||g.region===mapRegion);
+  $('#mapInfo').textContent=`${mapRegion||'전국'} · 사이트 ${inR.length}곳, 남은 방문 ${inR.reduce((a,g)=>a+g.left,0)}회`;
+  const nopt=G.filter(g=>!g.pt).map(g=>g.site);
+  $('#mapNote').textContent='점 위치는 시·구 단위의 대략적인 위치입니다.'+(nopt.length?` 위치 미확인: ${nopt.join(', ')}.`:'')+' 지역을 누르면 확대됩니다.';
+  // side panel
+  let h='';
+  if(mapSite){const g=G.find(x=>skey(x.brand,x.site)===mapSite);if(g){h=`<div class="pane"><h2>${esc(g.brand+' '+g.site)} <span>${esc(g.region)}</span></h2>${g.vs.sort((a,b)=>(a.when||'9').localeCompare(b.when||'9')).map(itemHTML).join('')}<button class="btn" id="mapBack" style="margin-top:8px">← ${esc(mapRegion||'전국')} 목록</button></div>`}}
+  if(!h){const L=inR.filter(g=>g.left).sort((a,b)=>(b.late-a.late)||((a.next||'9').localeCompare(b.next||'9')));
+    h=`<div class="pane"><h2>${esc(mapRegion||'전국')} 남은 방문 <span>${L.length}곳</span></h2>${L.map(g=>`<button class="item" data-mapsite="${esc(skey(g.brand,g.site))}"><span class="d">${g.next?md(g.next):(g.vs.find(v=>v.state!=='done')?.month||'')+'월'}</span><span><b>${esc(label(g))}</b> <span class="jd ${g.late?'warn':'info'}">${g.late?'지연':'남은 '+g.left+'회'}</span><br><span class="m">${esc(g.region)}</span></span></button>`).join('')||'<div class="empty">남은 방문이 없습니다.</div>'}</div>`}
+  $('#mapSide').innerHTML=h;
+  document.querySelectorAll('[data-mapsite]').forEach(x=>x.onclick=()=>{mapSite=x.dataset.mapsite;renderMap(allVisits())});
+  const bk=document.getElementById('mapBack'); if(bk) bk.onclick=()=>{mapSite='';renderMap(allVisits())};
+}
+$('#mapAll').onclick=()=>{mapRegion='';mapSite='';renderMap(allVisits())};
+$('#mapLeftOnly').addEventListener('change',()=>renderMap(allVisits()));
+
+function renderMaint(S){
+  renderChanges();
+  const chg=new Set(recentChanges().map(c=>c.brand+'|'+c.site));
+  const kinds=[...new Set(S.flatMap(s=>s.J.map(j=>j[1].replace(/\s*\(.*$/,''))))];
+  if($('#mJudge').options.length!==kinds.length+1){fillSel($('#mJudge'),kinds.map(k=>[k,k]),'전체 판정');$('#mJudge').value=maintFilter}
+  const q=$('#mq').value.replace(/[\s_]/g,''),f=$('#mJudge').value;
+  const rank={bad:0,warn:1,info:2,ok:3};
+  const rows=S.filter(s=>(!q||(s.brand+s.site).replace(/[\s_]/g,'').includes(q))&&(!f||s.J.some(j=>j[1].startsWith(f.trim()))))
+    .sort((a,b)=>Math.min(...a.J.map(j=>rank[j[0]]))-Math.min(...b.J.map(j=>rank[j[0]]))||a.brand.localeCompare(b.brand));
+  $('#mCount').textContent=`${rows.length}곳`;
+  $('#maintRows').innerHTML=rows.map(s=>`<tr><td>${s.J.map(j=>`<span class="jd ${j[0]}">${esc(j[1])}</span>`).join(' ')}</td><td>${esc(s.brand)}</td><td>${esc(s.site)}${chg.has(s.brand+'|'+s.site)?' <span class="jd warn">계약 변경</span>':''}</td><td class="num">${s.cnt}</td><td class="num">${s.done}</td><td>${s.next?md(s.next):''}</td><td>${esc(s.maintInsp||'—')}</td><td>${esc(s.maintEndText||'—')}</td><td class="small">${esc(s.desc||'')}</td></tr>`).join('');
+}
+function renderCheck(S){
+  const bad=S.filter(s=>s.J.some(j=>j[0]==='bad'||j[0]==='warn'));
+  $('#chkMaint').innerHTML=bad.map(s=>`<tr><td>${s.J.filter(j=>j[0]!=='ok').map(j=>`<span class="jd ${j[0]}">${esc(j[1])}</span>`).join(' ')}</td><td>${esc(s.brand+' '+s.site)}</td><td class="small">일정 ${s.cnt}회, 남은 ${s.left}회${s.next?', 다음 '+md(s.next):''}. 계약: ${esc(s.desc||'—')}${s.maintEndText?' / 종료 '+esc(s.maintEndText):''}</td></tr>`).join('')||'<tr><td colspan="3" class="empty">없음</td></tr>';
+  $('#chkCal').innerHTML=(base.calIssues||[]).map(c=>`<tr><td>${esc(c.kind)}</td><td>${esc(c.site)}</td><td class="small">${esc(c.text)}</td></tr>`).join('');
+}
+function renderN27(){
+  $('#n27Rows').innerHTML=(base.new27||[]).map(g=>`<tr><td>${esc(g.brand)}</td><td>${esc(g.site)}</td><td>${esc(g.open)}</td><td>${esc(g.type)}</td><td>${esc(g.insp)}</td><td>${esc(g.end||'기간 미기재')}</td><td>${esc(g.halls)}</td></tr>`).join('');
+}
+
+/* ---------- edit ---------- */
+let editing=null;
+const monthOpts=()=>'<option value="">미정</option>'+[...Array(12)].map((_,i)=>`<option value="${i+1}">${i+1}월</option>`).join('');
+$('#dMonth').innerHTML=monthOpts(); $('#aMonth').innerHTML=monthOpts();
+function openEdit(id){
+  const V=allVisits(); const e=V.find(x=>x.id===id); if(!e)return; editing=e;
+  const s=judgeSites(V).find(x=>x.brand===e.brand&&x.site===e.site);
+  $('#dSite').textContent=`${e.brand} ${e.site}${e.half?' '+e.half:''}`;
+  $('#dMeta').textContent=[e.region,e.halls?e.halls+'개관':'',e.note].filter(Boolean).join(', ');
+  $('#dDone').checked=e.done; $('#dConf').checked=e.confirmed; $('#dDate').value=e.date||e.planned||''; $('#dMonth').value=e.month||''; $('#dVis').value=e.visitors||''; $('#dMemo').value=e.memo||'';
+  $('#dDate').placeholder=e.planned||'';
+  $('#dContract').innerHTML=s?`유지보수 계약: ${esc(s.desc||'계약표에 없음')}${s.maintEndText?' / 종료 '+esc(s.maintEndText):''}<br>${s.J.map(j=>`<span class="jd ${j[0]}">${esc(j[1])}</span>`).join(' ')}`:'';
+  $('#dSrc').textContent=(e.planned&&!e.date?`달력 계획일 ${md(e.planned)}. `:'')+(e.droppedPlan?`달력 계획일 ${md(e.droppedPlan)}이 지나 날짜를 비우고 ${e.month}월 계획으로만 표시 중. `:'')+(e.src==='schedule'?'근무일정 확정으로 반영됨.':e.src==='slack'?'슬랙 완료 보고로 반영됨.':e.src==='manual'?'웹에서 수정됨.':e.src==='web'?'웹에서 추가한 방문.':'일정계획 시트 원본 값.');
+  const ro=!db||canWrite===false;
+  ['#dDone','#dConf','#dDate','#dMonth','#dVis','#dMemo'].forEach(x=>$(x).disabled=ro); $('#dSave').hidden=ro;
+  $('#dlg').showModal();
+}
+$('#dDate').addEventListener('change',()=>{if($('#dDate').value)$('#dMonth').value=String(+$('#dDate').value.slice(5,7))});
+$('#dMonth').addEventListener('change',()=>{const d=$('#dDate').value;if(d&&String(+d.slice(5,7))!==$('#dMonth').value)$('#dDate').value=''});
+$('#dlg').addEventListener('close',async()=>{
+  if($('#dlg').returnValue!=='save'||!editing||!db)return;
+  const uid=userNs?await userNs.id():null;
+  const dv=$('#dDate').value||null; const cal=editing.planned&&!editing.date;
+  const body={noPlan:!!(editing.planned&&!dv),confirmed:$('#dConf').checked,done:$('#dDone').checked,date:(cal&&dv===editing.planned)?null:dv,month:$('#dMonth').value?+$('#dMonth').value:null,visitors:$('#dVis').value.trim(),memo:$('#dMemo').value.trim(),source:'manual',updatedAt:new Date().toISOString(),updatedBy:uid};
+  try{
+    if(editing.extra) await db.doc(`years/${year}/extra/${editing.id}`).update({confirmed:body.confirmed,done:body.done,date:body.date,month:body.month,visitors:body.visitors,memo:body.memo,updatedAt:body.updatedAt,updatedBy:uid});
+    else await db.doc(`years/${year}/status/${editing.id}`).set(body);
+  }catch(err){alert('저장하지 못했습니다: '+(err.code==='permission_denied'?'수정 권한이 없습니다. 관리자에게 수정 권한을 요청하세요.':err.message))}
+});
+$('#addBtn').onclick=()=>{
+  if(!db||canWrite===false){alert('이 화면에서는 방문을 추가할 수 없습니다(보기 전용).');return}
+  $('#aSite').innerHTML=base.sites.filter(s=>s.status==='운영').sort((a,b)=>a.brand.localeCompare(b.brand)||a.site.localeCompare(b.site)).map((s,i)=>`<option value="${i}" data-b="${esc(s.brand)}" data-s="${esc(s.site)}">${esc(s.brand+' '+s.site)}</option>`).join('');
+  ['#aDate','#aVis','#aMemo'].forEach(x=>$(x).value=''); $('#aMonth').value=''; $('#aHalf').value='';
+  $('#addDlg').showModal();
+};
+$('#addDlg').addEventListener('close',async()=>{
+  if($('#addDlg').returnValue!=='save')return;
+  const o=$('#aSite').selectedOptions[0]; if(!o)return;
+  const v=base.visits.find(x=>x.brand===o.dataset.b&&x.site===o.dataset.s);
+  const date=$('#aDate').value||null;
+  const id='w'+Date.now().toString(36);
+  try{await db.doc(`years/${year}/extra/${id}`).set({brand:o.dataset.b,site:o.dataset.s,region:v?.region||'',halls:v?.halls||null,half:$('#aHalf').value,month:date?+date.slice(5,7):($('#aMonth').value?+$('#aMonth').value:null),date,visitors:$('#aVis').value.trim(),memo:$('#aMemo').value.trim(),done:false,createdAt:new Date().toISOString(),createdBy:userNs?await userNs.id():null})}
+  catch(err){alert('추가하지 못했습니다: '+err.message)}
+});
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-id]');if(b&&!b.closest('#cands'))openEdit(b.dataset.id)});
+
+/* ---------- tabs ---------- */
+function openTab(t){document.querySelectorAll('nav.tabs button').forEach(x=>x.setAttribute('aria-selected',x.dataset.tab===t));document.querySelectorAll('section[id^=tab-]').forEach(s=>s.hidden=s.id!=='tab-'+t)}
+document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>openTab(b.dataset.tab));
+$('#prevM').onclick=()=>{calM=Math.max(0,calM-1);render()};
+$('#nextM').onclick=()=>{calM=Math.min(11,calM+1);render()};
+$('#cRegion').addEventListener('input',()=>renderCal(allVisits()));
+$('#todayM').onclick=()=>{calM=year===TODAY.getFullYear()?TODAY.getMonth():0;render()};
+['#pq','#pBrand','#pRegion','#pMonth','#pState'].forEach(s=>$(s).addEventListener(s==='#pState'?'change':'input',()=>{const V=allVisits();renderPlan(V,judgeSites(V))}));
+['#mq','#mJudge'].forEach(s=>$(s).addEventListener('input',()=>{maintFilter=$('#mJudge').value;renderMaint(judgeSites(allVisits()))}));
+
+/* ---------- slack ---------- */
+const norm=s=>s.replace(/\s|\(.*?\)|프리미엄|직영|\(직\)|_/g,'').toLowerCase();
+function siteKeys(e){const k=new Set([norm(e.site)]);if(e.site==='C해운대')k.add('cgv해운대');if(e.site.includes('케이트리'))k.add('케이트리');if(e.site.includes('개포자이'))k.add('개포자이');if(e.site.startsWith('미8군'))k.add('평택');for(const suf of['시네센터','영상테마파크','자동차극장'])if(e.site.replace(/\s/g,'').endsWith(suf))k.add(norm(e.site).slice(0,-suf.length));if(e.site==='영상물등급위원회')k.add('영등위');return[...k].filter(x=>x.length>=2)}
+function brandHit(e,t){const b=e.brand,p=x=>new RegExp('(^|[^A-Za-z])'+x+'(?=\\s?[가-힣])').test(t);if(b.startsWith('롯데'))return/롯데/.test(t)||p('L');if(b.startsWith('메가'))return/메가/.test(t)||p('M');if(b==='CGV')return/cgv|씨지브이/i.test(t)||p('C');if(b.startsWith('모노'))return/모노/.test(t);return null}
+function parseSlack(text){const out=[];for(const p of String(text).split(/\n(?=\d+\.\s#)/)){const m=p.match(/^\d+\.\s#\S+\s-\s([^:]+):\s([\s\S]*?)\s(\d{4}-\d{2}-\d{2})\s\d{2}:\d{2}:\d{2}\sKST/);if(m)out.push({author:m[1].trim(),text:m[2].trim(),date:m[3]})}return out}
+let cands=[];
+function msgKey(m){let h=0;const s=m.author+'|'+m.date+'|'+m.text.slice(0,80);for(let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))|0}return 'm'+(h>>>0).toString(36)+m.date.replace(/-/g,'')}
+$('#slackRun').onclick=async()=>{
+  const st=$('#slackState');$('#cands').innerHTML='';$('#applyRow').hidden=true;
+  const mcp=await CL.use('mcp'); if(!mcp){st.textContent='슬랙 자동 확인은 슬랙 앱 승인 후 켜집니다. 그 전까지는 완료 보고를 보고 방문 수정 창에서 완료로 바꿔 주세요.';return}
+  st.textContent='슬랙에서 찾는 중…';$('#slackRun').disabled=true;
+  let msgs=[],cursor;
+  try{for(let i=0;i<3;i++){const input={keywords:['정기점검','완료'],filters:`in:<#${SLACK_CH}> after:${year}-01-01`,natural_language_query:'정기점검 완료 보고',limit:20,include_context:false,response_format:'concise',sort:'timestamp'};if(cursor)input.cursor=cursor;
+    const r=await mcp.callTool('Slack','slack_search_public',input);const txt=typeof r.payload==='string'?r.payload:(r.payload?.results??JSON.stringify(r.payload));msgs.push(...parseSlack(txt));
+    const pag=typeof r.payload==='object'?r.payload?.pagination_info:String(r.payload);const cm=String(pag||'').match(/cursor `([^`]+)`/);if(!cm)break;cursor=cm[1]}}
+  catch(err){const fix={server_not_connected:'슬랙 커넥터가 연결되어 있지 않습니다. claude.ai 커넥터 설정에서 Slack을 연결해 주세요.',needs_reauth:'슬랙 로그인이 만료되었습니다. 커넥터에서 다시 연결해 주세요.',server_unavailable:'슬랙이 잠시 응답하지 않습니다.',not_granted:'슬랙 연결 사용이 허용되지 않았습니다.',blocked_by_policy:'조직 정책으로 막혀 있습니다.'};st.textContent=fix[err.code]||('슬랙 조회 실패: '+(err.message||err.code));$('#slackRun').disabled=false;return}
+  $('#slackRun').disabled=false;
+  const V=allVisits(), open=V.filter(e=>e.state!=='done'), doneV=V.filter(e=>e.state==='done'); cands=[];
+  const doneMsgs=msgs.filter(m=>/완료/.test(m.text));
+  const near=(a,b,n)=>a&&b&&Math.abs((pd(a)-pd(b))/864e5)<=n;
+  const sk={seen:0,already:0,window:0,dup:0};
+  const byVisit={};
+  doneMsgs.forEach(m=>{
+    m.key=msgKey(m);
+    if(slackSeen[m.key]){sk.seen++;return}
+    const t=norm(m.text.slice(0,120));
+    const match=e=>siteKeys(e).some(k=>t.includes(k))&&brandHit(e,m.text)!==false;
+    // 같은 사이트의 완료된 방문이 보고일 ±10일 안에 있으면 이미 반영된 보고
+    if(doneV.some(e=>match(e)&&near(e.date,m.date,10))){sk.already++;return}
+    const H=pd(m.date).getMonth()>=6?'하반기':'상반기';
+    let hits=open.filter(e=>match(e)&&!(e.half&&e.half!==H&&e.half!=='추가'));
+    if(!hits.length){ if(open.some(match)) sk.window++; return }
+    hits.sort((a,b)=>Math.abs(pd(a.when||`${year}-${String(a.month||6).padStart(2,'0')}-15`)-pd(m.date))-Math.abs(pd(b.when||`${year}-${String(b.month||6).padStart(2,'0')}-15`)-pd(m.date)));
+    const vid=hits[0].id;
+    if(byVisit[vid]){sk.dup++; if(byVisit[vid].m.date<=m.date) return; cands.splice(cands.indexOf(byVisit[vid]),1)}
+    const c={m,hits,pick:vid,date:m.date}; byVisit[vid]=c; cands.push(c);
+  });
+  st.textContent=`완료 보고 ${doneMsgs.length}건 중 새로 반영할 후보 ${cands.length}건.`;
+  $('#slackSkipped').textContent=`숨긴 보고: 이미 완료 처리된 방문과 일치 ${sk.already}건, 이전에 반영·제외한 보고 ${sk.seen}건, 회차가 맞지 않음(예: 상반기 보고에 하반기 방문) ${sk.window}건, 같은 방문에 대한 중복 보고 ${sk.dup}건.`;
+  $('#cands').innerHTML=cands.map((c,i)=>`<div class="cand"><input type="checkbox" id="c${i}" checked aria-label="반영"><div><div class="row"><select data-i="${i}" class="cpick">${c.hits.map(e=>`<option value="${e.id}">${esc(label(e))} (${e.when?md(e.when):'미정'})</option>`).join('')}</select><input type="date" data-i="${i}" class="cdate" value="${c.date}"> <span class="note">보고: ${esc(c.m.author)}</span></div><div class="msg">${esc(c.m.text)}</div></div></div>`).join('')||'<div class="empty">새로 반영할 완료 보고가 없습니다.</div>';
+  $('#applyRow').hidden=!cands.length;
+  document.querySelectorAll('.cpick').forEach(s=>s.onchange=()=>cands[s.dataset.i].pick=s.value);
+  document.querySelectorAll('.cdate').forEach(s=>s.onchange=()=>cands[s.dataset.i].date=s.value);
+};
+$('#ignoreBtn').onclick=async()=>{
+  if(!db)return;let n=0;
+  for(let i=0;i<cands.length;i++){if($('#c'+i).checked)continue;const c=cands[i];try{await db.doc(`years/${year}/slackseen/${c.m.key}`).set({action:'ignored',date:c.date,author:c.m.author,at:new Date().toISOString()});n++}catch(e){}}
+  $('#slackState').textContent=`${n}건을 다음부터 숨깁니다.`;
+};
+$('#applyBtn').onclick=async()=>{
+  if(!db)return;const uid=userNs?await userNs.id():null;let n=0;$('#applyBtn').disabled=true;
+  for(let i=0;i<cands.length;i++){if(!$('#c'+i).checked)continue;const c=cands[i];const e=allVisits().find(x=>x.id===c.pick);
+    try{if(e.extra)await db.doc(`years/${year}/extra/${c.pick}`).update({done:true,date:c.date,month:+c.date.slice(5,7),visitors:e.visitors||c.m.author});
+      else await db.doc(`years/${year}/status/${c.pick}`).set({done:true,date:c.date,month:+c.date.slice(5,7),visitors:e.visitors||c.m.author,memo:e.memo||'',source:'slack',updatedAt:new Date().toISOString(),updatedBy:uid});n++}
+    catch(err){$('#slackState').textContent='일부 항목을 저장하지 못했습니다: '+(err.code==='permission_denied'?'편집 권한이 없습니다.':err.message);break}
+    try{await db.doc(`years/${year}/slackseen/${c.m.key}`).set({action:'applied',visitId:c.pick,date:c.date,author:c.m.author,at:new Date().toISOString()})}catch(e){}}
+  $('#applyBtn').disabled=false;$('#cands').innerHTML='';$('#applyRow').hidden=true;$('#slackState').textContent=`${n}건을 완료로 반영했습니다.`;
+};
+
+/* ---------- 근무일정 확정 반영 ---------- */
+let sCands=[];
+function parseDate(s){
+  let m=s.match(/(20\d{2})[-.\/]\s?(\d{1,2})[-.\/]\s?(\d{1,2})/); if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m=s.match(/(\d{1,2})\s?월\s?(\d{1,2})\s?일/)||s.match(/(?:^|[^\d])(\d{1,2})[\/.](\d{1,2})(?!\d)/); if(m&&+m[1]<=12&&+m[2]<=31) return `${year}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+  return null;
+}
+/* 근무일정 표 복사본: "26<탭>월" 같은 날짜 행 + 비고/칸 내용. 휴무·연차 옆의 날짜(대체휴무일)는 무시 */
+const SCHED_ROW=/^(\d{1,2})\s+[일월화수목금토](?=\s|$)/, SCHED_OFF=/휴무|연차|반차/;
+function schedFind(txt,month,open){
+  const lines=txt.split(/\n+/).map(l=>l.trim()).filter(Boolean);
+  let curM=month, lastDate=null; const found=[];
+  const isHead=l=>SCHED_ROW.test(l)||/(20\d{2})\s?년\s?(\d{1,2})\s?월/.test(l);
+  lines.forEach((l,i)=>{
+    const ym=l.match(/(20\d{2})\s?년\s?(\d{1,2})\s?월/); if(ym) curM=+ym[2];
+    const row=l.match(SCHED_ROW);
+    const prev=lines[i-1]||'';
+    if(row&&+row[1]>=1&&+row[1]<=31) lastDate=`${year}-${String(curM).padStart(2,'0')}-${row[1].padStart(2,'0')}`;
+    else if(!ym&&!SCHED_OFF.test(l)&&!(SCHED_OFF.test(prev)&&/^\d{1,2}\/\d{1,2}$/.test(l))){const d=parseDate(l); if(d) lastDate=d;}
+    if(!/정기\s?점검/.test(l)||!lastDate) return;
+    const lineDate=(!row&&!SCHED_OFF.test(l))?parseDate(l):null; const date=lineDate||lastDate;
+    const nxt=lines[i+1]||''; const nxtFree=!isHead(nxt)&&!parseDate(nxt)&&!/정기\s?점검/.test(nxt);
+    const prevFree=prev&&!isHead(prev)&&!/정기\s?점검/.test(prev)&&!SCHED_OFF.test(prev);
+    const match=s=>{const t=norm(s.replace(/정기\s?점검/g,''));return open.filter(e=>siteKeys(e).some(k=>t.includes(k))&&brandHit(e,s)!==false)};
+    const ctx=[l]; if(nxtFree) ctx.push(l+' '+nxt); if(prevFree) ctx.push(prev+' '+l);
+    let hits=[],used=l; for(const c of ctx){hits=match(c); if(hits.length){used=c;break}}
+    const people=STAFF.filter(n=>used.includes(n));
+    const far=e=>Math.abs(pd(e.when||`${year}-${String(e.month||6).padStart(2,'0')}-15`)-pd(date));
+    // 한 줄에 여러 사이트(예: "L수유, M울산 - 정기점검")가 있으면 사이트마다 따로 짝짓기
+    const by={}; hits.forEach(e=>(by[skey(e.brand,e.site)]??=[]).push(e));
+    const groups=Object.values(by).map(g=>g.sort((a,b)=>far(a)-far(b)));
+    if(!groups.length) found.push({line:l,date,people,hits:[]});
+    groups.forEach(g=>found.push({line:used,date,people,hits:g}));
+  });
+  const seen=new Set(), cands=[];
+  found.forEach(f=>{if(!f.hits.length)return;const id=f.hits[0].id;const k=id+f.date;if(seen.has(k))return;seen.add(k);cands.push({...f,pick:id})});
+  const miss=found.filter(f=>!f.hits.length);
+  return {found,cands,miss};
+}
+$('#schedParse').onclick=()=>{
+  const st=$('#schedState'); const V=allVisits(); const open=V.filter(v=>v.state!=='done');
+  const r=schedFind($('#schedIn').value,+$('#schedMonth').value||TODAY.getMonth()+1,open); sCands=r.cands; const miss=r.miss;
+  const same=c=>{const e=V.find(v=>v.id===c.pick);return e&&e.confirmed&&e.date===c.date};
+  const nSame=sCands.filter(same).length;
+  st.textContent=`정기점검 표기 ${r.found.length}건 중 방문과 맞는 ${sCands.length}건${nSame?` (이미 같은 날짜로 확정 ${nSame}건)`:''}${miss.length?`, 사이트를 찾지 못한 ${miss.length}건`:''}.`;
+  $('#schedCands').innerHTML=sCands.map((c,i)=>{const cur=V.find(v=>v.id===c.pick);const ok=same(c);return `<div class="cand"><input type="checkbox" id="s${i}" ${ok?'':'checked'} aria-label="반영"><div><div class="row"><select class="spick" data-i="${i}">${c.hits.map(e=>`<option value="${e.id}">${esc(label(e))} (현재 ${e.when?md(e.when):(e.month?e.month+'월':'미정')}${e.confirmed?' 확정':''})</option>`).join('')}</select><input type="date" class="sdate" data-i="${i}" value="${c.date}"><input type="text" class="svis" data-i="${i}" value="${esc(c.people.join(', ')||cur?.visitors||'')}" placeholder="점검자" style="border:1px solid var(--line);background:var(--panel);border-radius:5px;padding:3px 6px;font-size:13px;min-width:160px">${ok?'<span class="jd ok">이미 확정</span>':''}</div><div class="msg">${esc(c.line)}</div></div></div>`}).join('')+(miss.length?`<div class="note" style="margin-top:8px">사이트를 찾지 못한 줄: ${miss.map(m=>esc(m.line)).join(' / ')}</div>`:'');
+  $('#schedApplyRow').hidden=!sCands.length;
+  document.querySelectorAll('.spick').forEach(s=>s.onchange=()=>sCands[s.dataset.i].pick=s.value);
+  document.querySelectorAll('.sdate').forEach(s=>s.onchange=()=>sCands[s.dataset.i].date=s.value);
+  document.querySelectorAll('.svis').forEach(s=>s.oninput=()=>sCands[s.dataset.i].vis=s.value);
+};
+(()=>{const s=$('#schedMonth');for(let m=1;m<=12;m++)s.insertAdjacentHTML('beforeend',`<option value="${m}">${m}월</option>`);s.value=String(TODAY.getMonth()+1)})();
+$('#schedApply').onclick=async()=>{
+  if(!db||canWrite===false){$('#schedState').textContent='보기 전용 화면에서는 반영할 수 없습니다.';return}
+  const uid=userNs?await userNs.id():null; let n=0; $('#schedApply').disabled=true;
+  for(let i=0;i<sCands.length;i++){
+    if(!$('#s'+i).checked)continue; const c=sCands[i]; const e=allVisits().find(x=>x.id===c.pick); const vis=(c.vis??(c.people.join(', ')||e.visitors||'')).trim();
+    try{
+      if(e.extra) await db.doc(`years/${year}/extra/${c.pick}`).update({date:c.date,month:+c.date.slice(5,7),visitors:vis,confirmed:true});
+      else await db.doc(`years/${year}/status/${c.pick}`).set({done:e.done,date:c.date,month:+c.date.slice(5,7),visitors:vis,memo:e.memo||'',confirmed:true,source:'schedule',updatedAt:new Date().toISOString(),updatedBy:uid});
+      n++;
+    }catch(err){$('#schedState').textContent='저장하지 못했습니다: '+err.message;break}
+  }
+  $('#schedApply').disabled=false; $('#schedCands').innerHTML=''; $('#schedApplyRow').hidden=true; $('#schedState').textContent=`${n}건을 확정 일정으로 반영했습니다.`;
+};
+
+/* ---------- 데이터 불러오기 / 저장 (Supabase) ---------- */
+const kst=ts=>new Date(new Date(ts).getTime()+9*3600e3).toISOString();
+const kstDate=ts=>kst(ts).slice(0,10);
+const kstTime=ts=>kst(ts).slice(0,16).replace('T',' ');
+async function q(p){const {data,error}=await p;if(error)throw error;return data}
+let reloadTimer=null;
+function scheduleReload(){clearTimeout(reloadTimer);reloadTimer=setTimeout(()=>loadAll().catch(showLoadError),250)}
+function showLoadError(err){$('#srcline').textContent='데이터를 불러오지 못했습니다: '+(err.message||err)}
+
+// 화면 코드가 쓰는 값 → inspection_visits 열
+function toRow(b){
+  const r={};
+  if('done' in b) r.done=!!b.done;
+  if('date' in b) r.date=b.date||null;
+  if('month' in b) r.month=b.month??null;
+  if('visitors' in b) r.visitors=b.visitors||'';
+  if('memo' in b) r.memo=b.memo||'';
+  if('confirmed' in b) r.confirmed=!!b.confirmed;
+  if('source' in b) r.source=b.source;
+  if(b.noPlan) r.plan_date=null;
+  return r;
+}
+async function updateVisit(id,b){
+  const rows=await q(sb.from('inspection_visits').update(toRow(b)).eq('id',id).select('id'));
+  if(!rows.length){const e=new Error('수정 권한이 없습니다.');e.code='permission_denied';throw e}
+  scheduleReload();
+}
+async function addVisit(b){
+  const site=base.sites.find(x=>x.brand===b.brand&&x.site===b.site);
+  if(!site) throw new Error('사이트를 찾지 못했습니다.');
+  const pre=String(year).slice(2)+'-';
+  const n=Math.max(0,...base.visits.filter(v=>v.id.startsWith(pre)).map(v=>+v.id.slice(pre.length)||0))+1;
+  await q(sb.from('inspection_visits').insert({id:pre+String(n).padStart(3,'0'),year,site_id:site.id,half:b.half||'',month:b.month??null,date:b.date||null,visitors:b.visitors||'',memo:b.memo||'',done:!!b.done,source:'web'}));
+  scheduleReload();
+}
+async function markSlack(key,b){
+  await q(sb.from('inspection_slack_seen').upsert({msg_key:key,decision:b.action==='applied'?'applied':'dismissed',visit_id:b.visitId||null,msg_date:b.date||null,author:b.author||null}));
+  slackSeen[key]=b;
+}
+// 테스트 버전의 저장 방식(doc/collection)을 그대로 받아 Supabase로 넘김
+const DB={
+  doc(path){const p=path.split('/'),kind=p[2],id=p[3];return{
+    async set(b){if(kind==='status')return updateVisit(id,b);if(kind==='extra')return addVisit(b);if(kind==='slackseen')return markSlack(id,b)},
+    async update(b){if(kind==='status'||kind==='extra')return updateVisit(id,b)},
+    async get(){return{exists:false}}}},
+  collection(){return{onSnapshot(){}}}
+};
+
+async function loadAll(){
+  const yrs=await q(sb.from('inspection_years').select('*').order('year'));
+  if(!yrs.length) throw new Error('등록된 연도가 없습니다.');
+  if(!yrs.some(y=>y.year===year)) year=yrs[yrs.length-1].year;
+  const Y=yrs.find(y=>y.year===year);
+  const [sites,visits,contract,staff,news,checks,seen,log,chg]=await Promise.all([
+    q(sb.from('inspection_sites').select('*').order('id')),
+    q(sb.from('inspection_visits').select('*').eq('year',year).order('id')),
+    q(sb.from('inspection_site_contract').select('*')),
+    q(sb.from('inspection_staff').select('*').eq('active',true).order('sort')),
+    q(sb.from('inspection_new_sites').select('*').eq('target_year',year+1).order('id')),
+    q(sb.from('inspection_check_items').select('*').eq('year',year).eq('resolved',false).order('id')),
+    q(sb.from('inspection_slack_seen').select('msg_key,decision,visit_id,msg_date,author')),
+    q(sb.from('inspection_sync_log').select('*').eq('status','ok').order('ran_at',{ascending:false}).limit(10)),
+    q(sb.from('inspection_maint_changes').select('*').order('change_date'))
+  ]);
+  const C={}; contract.forEach(c=>C[c.site_id]=c);
+  const S={}; sites.forEach(x=>S[x.id]=x);
+  const byC={}; sites.forEach(x=>{if(x.contract_brand) byC[x.contract_brand+'|'+(x.contract_site||'')]=x});
+  MAP.pts={}; sites.forEach(x=>{if(x.map_x!=null&&!MAP.pts[x.site]) MAP.pts[x.site]=[x.map_x,x.map_y]});
+  if(staff.length) STAFF=staff.map(x=>x.name);
+  base={year,asOf:TISO,
+    sources:{plan:Y.plan_source||'',maint:`유지보수 및 워런티 진행 사이트 (매주 월요일 자동 동기화${log[0]?`, ${kstTime(log[0].ran_at)} 기준`:''})`},
+    sites:sites.map(x=>{const c=C[x.id];return{id:x.id,brand:x.brand,site:x.site,status:x.status,note:x.note,inMaint:!!c,
+      maintInsp:c?c.maint_insp:null,maintEnd:c?c.maint_end:null,maintEndText:c?c.maint_end_text:null,maintType:c?c.maint_type:null,desc:c?c.maint_desc:null,monoWarrantyOnly:false}}),
+    visits:visits.map(v=>{const x=S[v.site_id]||{};return{id:v.id,brand:x.brand,site:x.site,region:x.region||'',halls:x.halls,half:v.half||'',month:v.month,date:v.date,planned:v.plan_date,visitors:v.visitors||'',done:v.done,confirmed:v.confirmed,note:v.note||''}}),
+    new27:news.map(g=>({brand:g.brand,site:g.site,open:g.open,type:g.type,insp:g.insp,end:g.end_text,halls:g.halls})),
+    calIssues:checks,
+    maintLog:[...log].reverse().map(l=>({date:kstDate(l.ran_at),sheetAt:kstTime(l.ran_at),changes:+(((l.message||'').match(/변경 (\d+)건/))||[0,0])[1]})),
+    maintChanges:chg.map(c=>{const x=byC[c.brand+'|'+(c.site||'')];return{date:c.change_date,brand:x?x.brand:c.brand,site:x?x.site:(c.site||''),type:c.contract_type,item:c.item,from:c.from_value,to:c.to_value}})
+  };
+  status={}; visits.forEach(v=>status[v.id]={memo:v.memo||'',source:v.source==='sheet'?null:v.source,updatedAt:v.updated_at});
+  slackSeen={}; seen.forEach(r=>slackSeen[r.msg_key.replace(/^legacy:/,'')]={action:r.decision,visitId:r.visit_id,date:r.msg_date,author:r.author});
+  document.title=`${year} 정기점검 현황`; $('#title').textContent=`${year} 정기점검 현황`;
+  render(); srcLine();
+}
+function srcLine(){
+  $('#srcline').textContent=`${md(TISO)} 현재, ${canWrite?'수정 가능':'보기 전용 (수정은 등록된 사람만 가능)'}`;
+  $('#srcs').textContent=`일정계획: ${base.sources.plan}  |  유지보수 계약: ${base.sources.maint}`;
+}
+
+/* ---------- 로그인 ---------- */
+function showGate(msg){$('#gate').hidden=false;$('#app').hidden=true;if(msg)$('#gateMsg').textContent=msg}
+$('#loginBtn').onclick=()=>sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname+location.search,queryParams:{hd:ALLOWED_DOMAIN,prompt:'select_account'}}});
+$('#logoutBtn').onclick=async()=>{await sb.auth.signOut();location.reload()};
+let started=false;
+async function start(session){
+  const u=session&&session.user; if(!u){showGate();return}
+  const email=(u.email||'').toLowerCase();
+  if(!email.endsWith('@'+ALLOWED_DOMAIN)){await sb.auth.signOut();showGate(`${email} 계정은 사용할 수 없습니다. 회사 계정(@${ALLOWED_DOMAIN})으로 로그인하세요.`);return}
+  me=u; $('#gate').hidden=true; $('#app').hidden=false; $('#logoutBtn').hidden=false;
+  const md_=u.user_metadata||{}, nm=md_.full_name||md_.name||email, av=md_.avatar_url;
+  $('#me').innerHTML=(av?`<img alt="" src="${esc(av)}">`:'')+'<span></span>'; $('#me span').textContent=nm;
+  try{canWrite=!!(await q(sb.rpc('inspection_can_edit')))}catch(e){canWrite=false}
+  if(!canWrite) $('#slackRun').disabled=true;
+  db=DB;
+  try{await loadAll()}catch(err){showLoadError(err)}
+}
+sb.auth.onAuthStateChange((ev,session)=>{
+  if(ev==='SIGNED_OUT'){started=false;showGate();return}
+  if(!started&&session){started=true;start(session)}
+});
+sb.auth.getSession().then(({data})=>{if(!started){if(data.session){started=true;start(data.session)}else showGate()}});
+window.addEventListener('focus',()=>{if(started&&db&&!document.querySelector('dialog[open]'))scheduleReload()});
+setInterval(()=>{if(started&&db&&!document.hidden&&!document.querySelector('dialog[open]'))scheduleReload()},120000);
+
+</script>
+
+</body>
+</html>
