@@ -382,7 +382,7 @@ dialog select{width:100%;border:1px solid var(--line);background:var(--bg);borde
 
   <section id="tab-n27" hidden>
     <p class="note">유지보수 계약에 정기점검이 있으나 2026년 설치라 올해 일정계획에서 빠진 곳입니다. 27년 계획 수립 시 포함합니다.</p>
-    <div class="tbl"><table><thead><tr><th>브랜드</th><th>사이트</th><th>설치(오픈)일</th><th>계약 형태</th><th>정기점검</th><th>계약 종료일</th><th>관</th></tr></thead><tbody id="n27Rows"></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>브랜드</th><th>사이트</th><th>설치(오픈)일</th><th>계약 형태</th><th>정기점검</th><th>계약 종료일</th><th>관</th><th>올해 방문</th></tr></thead><tbody id="n27Rows"></tbody></table></div>
   </section>
 </div>
 
@@ -408,6 +408,7 @@ dialog select{width:100%;border:1px solid var(--line);background:var(--bg);borde
   <form method="dialog">
     <h3>방문 추가</h3>
     <label>사이트<select id="aSite"></select></label>
+    <label id="aRegionWrap" hidden>지역 (새로 등록하는 사이트)<select id="aRegion"></select></label>
     <div class="two">
       <label>회차<select id="aHalf"><option value="">연 1회</option><option>상반기</option><option>하반기</option><option>추가</option></select></label>
       <label>계획월<select id="aMonth"></select></label>
@@ -415,7 +416,7 @@ dialog select{width:100%;border:1px solid var(--line);background:var(--bg);borde
     <label>점검일<input type="date" id="aDate"></label>
     <label>점검자<input type="text" id="aVis"></label>
     <label>메모<input type="text" id="aMemo"></label>
-    <div class="foot"><button class="btn" value="cancel">취소</button><button class="btn primary" value="save">추가</button></div>
+    <div class="foot"><button class="btn" value="cancel" formnovalidate>취소</button><button class="btn primary" value="save">추가</button></div>
   </form>
 </dialog>
 
@@ -471,6 +472,7 @@ const stCls=s=>s==='tbd2'?'tbd':s;
 /* ---------- 유지보수 계약 판정 ---------- */
 function judgeSites(V){
   const by={}; V.forEach(v=>(by[skey(v.brand,v.site)]??=[]).push(v));
+  const newSites=new Set((base.new27||[]).map(g=>skey(g.brand,g.site)));
   const out=[];
   for(const s of base.sites){
     const vs=by[skey(s.brand,s.site)]||[];
@@ -493,7 +495,7 @@ function judgeSites(V){
         }
       }
     }else if(s.inMaint && ic && s.status==='운영' && (!s.maintEnd||s.maintEnd>=TISO)){
-      J.push(['bad','계약 있는데 일정 없음']);
+      J.push(newSites.has(skey(s.brand,s.site))?['info',`${year} 설치, ${(year+1)%100}년부터 정기점검`]:['bad','계약 있는데 일정 없음']);
     }else continue;
     if(!J.length) J.push(['ok','일치']);
     out.push({...s,cnt,done,left:left.length,next,J,maintInsp:mono?'1회 (모노 기본값)':s.maintInsp,desc:mono?'모노플렉스 기본값 연 1회 (계약표 미기재)':s.desc});
@@ -661,7 +663,14 @@ function renderCheck(S){
   $('#chkCal').innerHTML=(base.calIssues||[]).map(c=>`<tr><td>${esc(c.kind)}</td><td>${esc(c.site)}</td><td class="small">${esc(c.text)}</td></tr>`).join('');
 }
 function renderN27(){
-  $('#n27Rows').innerHTML=(base.new27||[]).map(g=>`<tr><td>${esc(g.brand)}</td><td>${esc(g.site)}</td><td>${esc(g.open)}</td><td>${esc(g.type)}</td><td>${esc(g.insp)}</td><td>${esc(g.end||'기간 미기재')}</td><td>${esc(g.halls)}</td></tr>`).join('');
+  const V=allVisits(), shown=new Set();
+  $('#n27Rows').innerHTML=(base.new27||[]).map(g=>{
+    const k=skey(g.brand,g.site), first=!shown.has(k); shown.add(k);
+    const vs=V.filter(v=>skey(v.brand,v.site)===k);
+    const cell=!first?'':vs.length?vs.map(v=>`<button class="vis ${stCls(v.state)}" data-id="${v.id}">${v.when?md(v.when):v.month?v.month+'월':'미정'} ${stName[v.state]}</button>`).join('')
+      :canWrite?`<button class="btn" data-addsite="${esc(k)}">올해 방문 추가</button>`:'—';
+    return `<tr><td>${esc(g.brand)}</td><td>${esc(g.site)}</td><td>${esc(g.open)}</td><td>${esc(g.type)}</td><td>${esc(g.insp)}</td><td>${esc(g.end||'기간 미기재')}</td><td>${esc(g.halls)}</td><td>${cell}</td></tr>`;
+  }).join('');
 }
 
 /* ---------- edit ---------- */
@@ -693,19 +702,42 @@ $('#dlg').addEventListener('close',async()=>{
     else await db.doc(`years/${year}/status/${editing.id}`).set(body);
   }catch(err){alert('저장하지 못했습니다: '+(err.code==='permission_denied'?'수정 권한이 없습니다. 관리자에게 수정 권한을 요청하세요.':err.message))}
 });
-$('#addBtn').onclick=()=>{
+// 올해 설치한 신규대상 중 아직 사이트 목록에 없는 곳. 방문 추가에서 고르면 저장할 때 사이트도 함께 등록
+const hallCount=t=>String(t||'').replace(/관/g,'').split(',').reduce((n,p)=>{const r=p.split('~').map(Number);return n+(r.length===2&&r[0]&&r[1]?r[1]-r[0]+1:p.trim()?1:0)},0)||null;
+function pendingNewSites(){
+  const have=new Set(base.sites.map(s=>skey(s.brand,s.site))), G={};
+  (base.new27||[]).forEach(g=>{const k=skey(g.brand,g.site);if(!have.has(k))(G[k]??=[]).push(g)});
+  return Object.values(G).map(gs=>({brand:gs[0].brand,site:gs[0].site,open:gs[0].open,halls:hallCount(gs.map(g=>g.halls).join(','))}));
+}
+const syncRegion=()=>{const n=!!$('#aSite').selectedOptions[0]?.dataset.new;$('#aRegionWrap').hidden=!n;$('#aRegion').required=n};
+function openAdd(pre){
   if(!db||canWrite===false){alert('이 화면에서는 방문을 추가할 수 없습니다(보기 전용).');return}
-  $('#aSite').innerHTML=base.sites.filter(s=>s.status==='운영').sort((a,b)=>a.brand.localeCompare(b.brand)||a.site.localeCompare(b.site)).map((s,i)=>`<option value="${i}" data-b="${esc(s.brand)}" data-s="${esc(s.site)}">${esc(s.brand+' '+s.site)}</option>`).join('');
-  ['#aDate','#aVis','#aMemo'].forEach(x=>$(x).value=''); $('#aMonth').value=''; $('#aHalf').value='';
-  $('#addDlg').showModal();
-};
+  const opt=(s,extra='')=>`<option data-b="${esc(s.brand)}" data-s="${esc(s.site)}"${extra}>${esc(s.brand+' '+s.site)}</option>`;
+  const P=pendingNewSites();
+  $('#aSite').innerHTML=base.sites.filter(s=>s.status==='운영').sort((a,b)=>a.brand.localeCompare(b.brand)||a.site.localeCompare(b.site)).map(s=>opt(s)).join('')
+    +(P.length?`<optgroup label="${year}년 설치 (추가하면 사이트도 등록)">${P.map(p=>opt(p,` data-new="1" data-halls="${p.halls??''}" data-open="${esc(p.open)}"`)).join('')}</optgroup>`:'');
+  if(pre){const o=[...$('#aSite').options].find(o=>skey(o.dataset.b,o.dataset.s)===pre.key);if(o)o.selected=true}
+  $('#aRegion').innerHTML='<option value="">지역 선택</option>'+REGIONS().map(r=>`<option>${esc(r)}</option>`).join('');
+  ['#aDate','#aVis','#aMemo'].forEach(x=>$(x).value=''); $('#aMonth').value=pre?.month?String(pre.month):''; $('#aHalf').value='';
+  syncRegion(); $('#addDlg').showModal();
+}
+$('#aSite').addEventListener('change',syncRegion);
+$('#addBtn').onclick=()=>openAdd();
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-addsite]');if(b)openAdd({key:b.dataset.addsite,month:12})});
+async function addSite(b){
+  const n=Math.max(0,...base.sites.map(s=>+String(s.id).slice(1)||0))+1, id='S'+String(n).padStart(3,'0');
+  await q(sb.from('inspection_sites').insert({id,brand:b.brand,site:b.site,region:b.region||null,halls:b.halls,status:'운영',note:b.note||'',contract_brand:b.brand,contract_site:b.site}));
+  base.sites.push({id,brand:b.brand,site:b.site,status:'운영',note:b.note||'',inMaint:false});
+}
 $('#addDlg').addEventListener('close',async()=>{
   if($('#addDlg').returnValue!=='save')return;
   const o=$('#aSite').selectedOptions[0]; if(!o)return;
   const v=base.visits.find(x=>x.brand===o.dataset.b&&x.site===o.dataset.s);
   const date=$('#aDate').value||null;
   const id='w'+Date.now().toString(36);
-  try{await db.doc(`years/${year}/extra/${id}`).set({brand:o.dataset.b,site:o.dataset.s,region:v?.region||'',halls:v?.halls||null,half:$('#aHalf').value,month:date?+date.slice(5,7):($('#aMonth').value?+$('#aMonth').value:null),date,visitors:$('#aVis').value.trim(),memo:$('#aMemo').value.trim(),done:false,createdAt:new Date().toISOString(),createdBy:userNs?await userNs.id():null})}
+  try{
+    if(o.dataset.new) await addSite({brand:o.dataset.b,site:o.dataset.s,region:$('#aRegion').value,halls:+o.dataset.halls||null,note:`${year} 설치 (${o.dataset.open} 오픈)`});
+    await db.doc(`years/${year}/extra/${id}`).set({brand:o.dataset.b,site:o.dataset.s,region:v?.region||'',halls:v?.halls||null,half:$('#aHalf').value,month:date?+date.slice(5,7):($('#aMonth').value?+$('#aMonth').value:null),date,visitors:$('#aVis').value.trim(),memo:$('#aMemo').value.trim(),done:false,createdAt:new Date().toISOString(),createdBy:userNs?await userNs.id():null})}
   catch(err){alert('추가하지 못했습니다: '+err.message)}
 });
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-id]');if(b&&!b.closest('#cands'))openEdit(b.dataset.id)});
